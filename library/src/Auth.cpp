@@ -33,9 +33,8 @@ void Auth::Token::populate(var::View data) {
 }
 
 Auth::Auth(FSAPI_LINK_DECLARE_DRIVER)
-  : FileAccess(
-    "/dev/auth",
-    fs::OpenMode::read_write() FSAPI_LINK_INHERIT_DRIVER_LAST) {}
+    : m_file("/dev/auth",
+             fs::OpenMode::read_write() FSAPI_LINK_INHERIT_DRIVER_LAST) {}
 
 bool Auth::authenticate(var::View key) {
   crypto::Random random;
@@ -55,20 +54,19 @@ bool Auth::authenticate(var::View key) {
   reverse_key_token.token = key_token.key;
 
   // do SHA256 calcs
-  hash.start();
-  hash << var::View(key_token);
-  hash.finish();
+  Token validation_token =
+      finish(Token(crypto::Sha256().update(var::View(key_token)).output()));
 
-  Token validation_token = finish(Token(hash.output()));
+  // hash.start();
+  // hash << var::View(reverse_key_token);
+  // hash.finish();
 
-  hash.start();
-  hash << var::View(reverse_key_token);
-  hash.finish();
+  const crypto::Sha256::Hash reverse_key_token_hash =
+      crypto::Sha256().update(var::View(reverse_key_token)).output();
 
   // hash output should match validation token
-  if (
-    var::View(hash.output())
-    == var::View(validation_token.auth_token())) {
+  if (var::View(reverse_key_token_hash) ==
+      var::View(validation_token.auth_token().data)) {
     return true;
   }
 
@@ -77,7 +75,7 @@ bool Auth::authenticate(var::View key) {
 
 Auth::Token Auth::start(const Token &token) {
   auth_token_t result = token.auth_token();
-  if (ioctl(I_AUTH_START, &result).status().is_error()) {
+  if (m_file.ioctl(I_AUTH_START, &result).is_error()) {
     return Token();
   }
   return Token(result);
@@ -85,7 +83,7 @@ Auth::Token Auth::start(const Token &token) {
 
 Auth::Token Auth::finish(const Token &token) {
   auth_token_t result = token.auth_token();
-  if (ioctl(I_AUTH_FINISH, &result).status().is_error()) {
+  if (m_file.ioctl(I_AUTH_FINISH, &result).is_error()) {
     return Token();
   }
   return Token(result);

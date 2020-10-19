@@ -19,18 +19,18 @@ printer::Printer &
 printer::operator<<(printer::Printer &printer, const appfs_file_t &a) {
   printer.key("name", var::StringView(a.hdr.name));
   printer.key("id", var::StringView(a.hdr.id));
-  printer.key("mode", var::NumberToString(a.hdr.mode, "0%o"));
+  printer.key("mode", var::NumberString(a.hdr.mode, "0%o"));
   printer.key(
     "version",
     var::String().format("%d.%d", a.hdr.version >> 8, a.hdr.version & 0xff));
-  printer.key("startup", var::NumberToString(a.exec.startup, "%p"));
-  printer.key("codeStart", var::NumberToString(a.exec.code_start, "%p"));
-  printer.key("codeSize", var::NumberToString(a.exec.code_size));
-  printer.key("ramStart", var::NumberToString(a.exec.ram_start, "%p"));
-  printer.key("ramSize", var::NumberToString(a.exec.ram_size));
-  printer.key("dataSize", var::NumberToString(a.exec.data_size));
-  printer.key("oFlags", var::NumberToString(a.exec.o_flags, "0x%lX"));
-  printer.key("signature", var::NumberToString(a.exec.signature, "0x%08lx"));
+  printer.key("startup", var::NumberString(a.exec.startup, "%p"));
+  printer.key("codeStart", var::NumberString(a.exec.code_start, "%p"));
+  printer.key("codeSize", var::NumberString(a.exec.code_size));
+  printer.key("ramStart", var::NumberString(a.exec.ram_start, "%p"));
+  printer.key("ramSize", var::NumberString(a.exec.ram_size));
+  printer.key("dataSize", var::NumberString(a.exec.data_size));
+  printer.key("oFlags", var::NumberString(a.exec.o_flags, "0x%lX"));
+  printer.key("signature", var::NumberString(a.exec.signature, "0x%08lx"));
   return printer;
 }
 
@@ -50,22 +50,22 @@ printer::operator<<(printer::Printer &printer,
   printer.key("dataTightlyCoupled", a.is_data_tightly_coupled());
   printer.key("startup", a.is_startup());
   printer.key("unique", a.is_unique());
-  printer.key("ramSize", var::NumberToString(a.ram_size()));
+  printer.key("ramSize", var::NumberString(a.ram_size()));
   return printer;
 }
 
 printer::Printer &printer::operator<<(printer::Printer &printer,
                                       const sos::Appfs::Info &a) {
   printer.key("name", a.name());
-  printer.key("mode", var::NumberToString(a.mode(), "0%o"));
+  printer.key("mode", var::NumberString(a.mode(), "0%o"));
   if (a.is_executable()) {
     printer.key("id", a.id());
     printer.key(
       "version",
       var::String().format("%d.%d", a.version() >> 8, a.version() & 0xff));
 
-    printer.key("signature", var::NumberToString(a.signature(), F3208X));
-    printer.key("ram", var::NumberToString(a.ram_size()));
+    printer.key("signature", var::NumberString(a.signature(), F3208X));
+    printer.key("ram", var::NumberString(a.ram_size()));
     printer.key("orphan", a.is_orphan());
     printer.key("flash", a.is_flash());
     printer.key("startup", a.is_startup());
@@ -122,7 +122,7 @@ int Appfs::FileAttributes::apply(fs::File &file) const {
   int location = file.location();
 
   if (
-    file.seek(0).read(appfs_file_reference).status().value()
+    file.seek(0).read(appfs_file_reference).return_value()
     != (int)appfs_file_reference.size()) {
     return -1;
   }
@@ -130,7 +130,7 @@ int Appfs::FileAttributes::apply(fs::File &file) const {
   this->apply(appfs_file_reference.to<appfs_file_t>());
 
   if (
-    file.seek(0).write(appfs_file_reference).status().value()
+    file.seek(0).write(appfs_file_reference).return_value()
     != (int)appfs_file_reference.size()) {
     return -1;
   }
@@ -148,15 +148,17 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
 }
 
 bool Appfs::is_flash_available() {
-  return fs::Dir("app/flash" FSAPI_LINK_MEMBER_DRIVER_LAST)
-    .status()
-    .is_success();
+  API_RETURN_VALUE_IF_ERROR(false);
+  bool result = fs::Dir("app/flash" FSAPI_LINK_MEMBER_DRIVER_LAST).is_success();
+  API_RESET_ERROR();
+  return result;
 }
 
 bool Appfs::is_ram_available() {
-  return fs::Dir("/app/ram" FSAPI_LINK_MEMBER_DRIVER_LAST)
-    .status()
-    .is_success();
+  API_RETURN_VALUE_IF_ERROR(false);
+  bool result = fs::Dir("/app/ram" FSAPI_LINK_MEMBER_DRIVER_LAST).is_success();
+  API_RESET_ERROR();
+  return result;
 }
 
 Appfs &Appfs::create(const Create &options) {
@@ -175,7 +177,7 @@ Appfs &Appfs::create(const Create &options) {
 
   while (appfs.is_ready()) {
     if (
-      options.source()->read(buffer_blob).status().value()
+      options.source()->read(buffer_blob).return_value()
       == buffer_blob.size()) {
 
       appfs.append(buffer_blob);
@@ -285,7 +287,12 @@ int Appfs::create_asynchronous(const Construct &options) {
   var::String path = options.mount() + "/flash/" + options.name();
 
   // delete the settings if they exist
-  strncpy(f->hdr.name, options.name().cstring(), LINK_NAME_MAX - 1);
+  const size_t size = options.name().length() > LINK_NAME_MAX - 1
+                          ? LINK_NAME_MAX - 1
+                          : options.name().length();
+
+  memcpy(f->hdr.name, options.name().data(), size);
+  f->hdr.name[size] = 0;
   f->hdr.mode = 0666;
   f->exec.code_size
     = options.size() + overhead(); // total number of bytes in file
@@ -336,7 +343,7 @@ Appfs &Appfs::append(var::View blob) {
         m_create_attributes.nbyte = page_size;
       }
       if (
-        m_file.ioctl(I_APPFS_CREATE, &m_create_attributes).status().value()
+        m_file.ioctl(I_APPFS_CREATE, &m_create_attributes).return_value()
         < 0) {
         return *this;
       }
@@ -347,7 +354,7 @@ Appfs &Appfs::append(var::View blob) {
 
   if (m_bytes_written == m_data_size) {
     // all done
-    m_file.close();
+    // m_file.close();
   }
 
   return *this;
@@ -416,14 +423,14 @@ Appfs::Info Appfs::get_info(var::StringView path) {
   fs::File(path, fs::OpenMode::read_only() FSAPI_LINK_MEMBER_DRIVER_LAST)
     .read(var::View(appfs_file_header));
 
-  if (status().is_error()) {
+  if (is_error()) {
     return Info();
   }
 
   if (result == sizeof(appfs_file_header)) {
     // first check to see if the name matches -- otherwise it isn't an app
     // file
-    const var::String path_name = fs::Path(path).name();
+    const var::StringView path_name = fs::Path(path).name();
 
     if (path_name.find(".sys") == 0) {
       API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", EINVAL);
@@ -494,7 +501,7 @@ Appfs &Appfs::cleanup(CleanData clean_data) {
     strcat(buffer, name);
 
     API_SYSTEM_CALL("", stat(buffer, &st));
-    if (status().is_error()) {
+    if (is_error()) {
       return *this;
     }
 
@@ -504,7 +511,7 @@ Appfs &Appfs::cleanup(CleanData clean_data) {
       && (name[0] != '.')) {
 
       API_SYSTEM_CALL("", unlink(buffer));
-      if (status().is_error()) {
+      if (is_error()) {
         return *this;
       }
     }

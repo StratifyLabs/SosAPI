@@ -28,7 +28,7 @@ namespace sos {
  * ```
  *
  */
-class Auth : public fs::FileAccess<Auth> {
+class Auth : public api::ExecutionContext {
 public:
   class Token {
   public:
@@ -74,12 +74,13 @@ public:
   Token start(const Token &token);
   Token finish(const Token &token);
 
-  bool is_valid() const { return status().is_success(); }
+  bool is_valid() const { return is_success(); }
 
 private:
 #if defined __link
   API_AF(Auth, link_transport_mdriver_t *, driver, nullptr);
 #endif
+  fs::File m_file;
 };
 
 } // namespace sys

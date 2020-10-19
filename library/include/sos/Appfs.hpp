@@ -67,7 +67,7 @@ API_OR_NAMED_FLAGS_OPERATOR(AppfsFlags, Flags)
  * \endcode
  *
  */
-class Appfs : public api::Object, public AppfsFlags {
+class Appfs : public api::ExecutionContext, public AppfsFlags {
 public:
   /*! \brief AppfsInfo Class
    * \details The AppfsInfo class is for

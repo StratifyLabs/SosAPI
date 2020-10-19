@@ -44,11 +44,11 @@ printer::Printer &printer::operator<<(printer::Printer &printer,
       clock_time.seconds(),
       clock_time.nanoseconds() / 1000UL));
   printer.key("id", id);
-  printer.key("thread", var::NumberToString(a.thread_id()));
-  printer.key("pid", var::NumberToString(a.pid()));
+  printer.key("thread", var::NumberString(a.thread_id()));
+  printer.key("pid", var::NumberString(a.pid()));
   printer.key(
     "programAddress",
-    var::NumberToString(a.program_address(), "0x%lX"));
+    var::NumberString(a.program_address(), "0x%lX"));
   printer.key("message", a.message());
   return printer;
 }
@@ -57,7 +57,7 @@ printer::Printer &printer::operator<<(printer::Printer &printer,
                                       const sos::Sys::Info &a) {
   printer.key("name", a.name());
   printer.key("serialNumber", a.serial_number().to_string());
-  printer.key("hardwareId", var::NumberToString(a.hardware_id(), F3208X));
+  printer.key("hardwareId", var::NumberString(a.hardware_id(), F3208X));
   if (a.name() != "bootloader") {
     printer.key("projectId", a.id());
     if (a.team_id().is_empty() == false) {
@@ -66,10 +66,10 @@ printer::Printer &printer::operator<<(printer::Printer &printer,
     printer.key("bspVersion", a.bsp_version());
     printer.key("sosVersion", a.sos_version());
     printer.key("cpuArchitecture", a.cpu_architecture());
-    printer.key("cpuFrequency", var::NumberToString(a.cpu_frequency()));
+    printer.key("cpuFrequency", var::NumberString(a.cpu_frequency()));
     printer.key(
       "applicationSignature",
-      var::NumberToString(a.application_signature(), F32X));
+      var::NumberString(a.application_signature(), F32X));
 
     printer.key("bspGitHash", a.bsp_git_hash());
     printer.key("sosGitHash", a.sos_git_hash());
@@ -84,21 +84,15 @@ SerialNumber::SerialNumber() { m_serial_number = {0}; }
 
 SerialNumber SerialNumber::from_string(var::StringView str) {
   SerialNumber ret;
-  u32 len = strnlen(str.cstring(), 8 * 4);
-  if (len == 8 * 4) {
+  if (str.length() == 8 * 4) {
+    const var::StackString64 s(str);
 #if defined __link
-    sscanf(
-      str.cstring(),
-      "%08X%08X%08X%08X",
+    sscanf(s.cstring(), "%08X%08X%08X%08X",
 #else
-    sscanf(
-      str.cstring(),
-      "%08lX%08lX%08lX%08lX",
+    sscanf(s.cstring(), "%08lX%08lX%08lX%08lX",
 #endif
-      &ret.m_serial_number.sn[3],
-      &ret.m_serial_number.sn[2],
-      &ret.m_serial_number.sn[1],
-      &ret.m_serial_number.sn[0]);
+           &ret.m_serial_number.sn[3], &ret.m_serial_number.sn[2],
+           &ret.m_serial_number.sn[1], &ret.m_serial_number.sn[0]);
   }
   return ret;
 }
@@ -128,26 +122,22 @@ var::String SerialNumber::to_string() const {
 }
 
 Sys::Sys(FSAPI_LINK_DECLARE_DRIVER)
-  : FileAccess<Sys>(
-    "/dev/sys",
-    fs::OpenMode::read_write() FSAPI_LINK_INHERIT_DRIVER_LAST) {}
+    : m_file("/dev/sys",
+             fs::OpenMode::read_write() FSAPI_LINK_INHERIT_DRIVER_LAST) {}
 
 Sys::Info Sys::get_info() const {
-  sys_info_t sys_info;
-  ioctl(I_SYS_GETINFO, &sys_info);
-  if (status().is_error()) {
-    return Sys::Info();
-  }
+  sys_info_t sys_info = {0};
+  m_file.ioctl(I_SYS_GETINFO, &sys_info);
   return Sys::Info(sys_info);
 }
 
 bool Sys::is_authenticated() const {
-  return ioctl(I_SYS_ISAUTHENTICATED, nullptr).status().value();
+  return m_file.ioctl(I_SYS_ISAUTHENTICATED, nullptr).return_value();
 }
 
 sys_secret_key_t Sys::get_secret_key() const {
   sys_secret_key_t result = {0};
-  ioctl(I_SYS_GETSECRETKEY, &result);
+  m_file.ioctl(I_SYS_GETSECRETKEY, &result);
   return result;
 }
 
@@ -157,14 +147,14 @@ SerialNumber Sys::get_serial_number() const {
 
 sys_id_t Sys::get_id() const {
   sys_id_t result = {0};
-  ioctl(I_SYS_GETID, &result);
+  m_file.ioctl(I_SYS_GETID, &result);
   return result;
 }
 
 #if !defined __link
 
 int Sys::get_board_config(sos_board_config_t &config) {
-  return ioctl(I_SYS_GETBOARDCONFIG, &config).status().value();
+  return ioctl(I_SYS_GETBOARDCONFIG, &config).return_value();
 }
 
 #endif

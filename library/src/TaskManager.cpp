@@ -7,17 +7,17 @@
 printer::Printer &printer::operator<<(printer::Printer &printer,
                                       const sos::TaskInfo &a) {
   printer.key("name", a.name());
-  printer.key("id", var::NumberToString(a.id()));
-  printer.key("pid", var::NumberToString(a.pid()));
-  printer.key("memorySize", var::NumberToString(a.memory_size()));
-  printer.key("stack", var::NumberToString(a.stack(), "0x%lX"));
-  printer.key("stackSize", var::NumberToString(a.stack_size()));
-  printer.key("priority", var::NumberToString(a.priority()));
-  printer.key("priorityCeiling", var::NumberToString(a.priority_ceiling()));
+  printer.key("id", var::NumberString(a.id()));
+  printer.key("pid", var::NumberString(a.pid()));
+  printer.key("memorySize", var::NumberString(a.memory_size()));
+  printer.key("stack", var::NumberString(a.stack(), "0x%lX"));
+  printer.key("stackSize", var::NumberString(a.stack_size()));
+  printer.key("priority", var::NumberString(a.priority()));
+  printer.key("priorityCeiling", var::NumberString(a.priority_ceiling()));
   printer.key("isThread", a.is_thread());
   if (a.is_thread() == false) {
-    printer.key("heap", var::NumberToString(a.heap(), "0x%lX"));
-    printer.key("heapSize", var::NumberToString(a.heap_size()));
+    printer.key("heap", var::NumberString(a.heap(), "0x%lX"));
+    printer.key("heapSize", var::NumberString(a.heap_size()));
   }
   return printer;
 }
@@ -63,9 +63,9 @@ int TaskManager::get_next(TaskInfo &info) {
   task_attr.tid = m_id;
   API_SYSTEM_CALL(
     "",
-    m_sys_device.ioctl(I_SYS_GETTASK, &task_attr).status().value());
+    m_sys_device.ioctl(I_SYS_GETTASK, &task_attr).return_value());
 
-  if (status().is_error()) {
+  if (is_error()) {
     info = TaskInfo::invalid();
   } else {
     info = task_attr;
@@ -89,7 +89,7 @@ TaskInfo TaskManager::get_info(u32 id) {
   if (
     API_SYSTEM_CALL(
       "",
-      m_sys_device.ioctl(I_SYS_GETTASK, &attr).status().value())
+      m_sys_device.ioctl(I_SYS_GETTASK, &attr).return_value())
     < 0) {
     return TaskInfo::invalid();
   }

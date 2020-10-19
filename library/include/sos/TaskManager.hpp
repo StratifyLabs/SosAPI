@@ -38,7 +38,10 @@ public:
   bool is_valid() const { return m_value.tid != static_cast<u32>(-1); }
 
   TaskInfo &set_name(var::StringView name) {
-    strncpy(m_value.name, name.cstring(), sizeof(m_value.name) - 1);
+    const size_t size = name.length() > sizeof(m_value.name) - 1
+                            ? sizeof(m_value.name) - 1
+                            : name.length();
+    memcpy(m_value.name, name.data(), size);
     return *this;
   }
 
@@ -145,7 +148,7 @@ typedef TaskInfo TaskAttributes;
  *
  *
  */
-class TaskManager : public api::Object {
+class TaskManager : public api::ExecutionContext {
 public:
   TaskManager(FSAPI_LINK_DECLARE_DRIVER_NULLPTR);
 

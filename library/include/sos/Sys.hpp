@@ -73,7 +73,7 @@ private:
 /*! \brief Sys Class
  * \details This class allows access to system attributes and functions.
  */
-class Sys : public fs::FileAccess<Sys> {
+class Sys : public api::ExecutionContext {
 public:
 
   /*! \brief System Information Class
@@ -218,6 +218,7 @@ public:
   sys_id_t get_id() const;
 
 private:
+  fs::File m_file;
 };
 
 } // namespace sys
