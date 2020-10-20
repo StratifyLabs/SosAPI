@@ -90,66 +90,50 @@ Appfs::FileAttributes::FileAttributes(const appfs_file_t &appfs_file) {
   m_version = appfs_file.hdr.version;
 }
 
-void Appfs::FileAttributes::apply(appfs_file_t *appfs_file) const {
+const Appfs::FileAttributes &
+Appfs::FileAttributes::apply(const fs::File &file) const {
+  appfs_file_t appfs_file;
+
+  int location = file.location();
+  file.seek(0).read(var::View(appfs_file));
 
   if (m_name.is_empty() == false) {
-    var::View(appfs_file->hdr.name)
+    var::View(appfs_file.hdr.name)
         .fill<u8>(0)
         .truncate(LINK_NAME_MAX - 1)
         .copy(m_name);
   }
 
   if (m_id.is_empty() == false) {
-    var::View(appfs_file->hdr.id)
+    var::View(appfs_file.hdr.id)
         .fill<u8>(0)
         .truncate(LINK_NAME_MAX - 1)
         .copy(m_id);
   }
 
   if (m_version != 0) {
-    appfs_file->hdr.version = m_version;
+    appfs_file.hdr.version = m_version;
   }
 
   if (m_access_mode != 0) {
-    appfs_file->hdr.mode = m_access_mode;
+    appfs_file.hdr.mode = m_access_mode;
   }
 
   if (m_ram_size >= 4096) {
-    appfs_file->exec.ram_size = m_ram_size;
+    appfs_file.exec.ram_size = m_ram_size;
   }
 
-  if (appfs_file->exec.ram_size < 4096) {
-    appfs_file->exec.ram_size = 4096;
+  if (appfs_file.exec.ram_size < 4096) {
+    appfs_file.exec.ram_size = 4096;
   }
 
-  appfs_file->exec.o_flags = m_o_flags;
-}
+  appfs_file.exec.o_flags = m_o_flags;
 
-int Appfs::FileAttributes::apply(fs::File &file) const {
-  appfs_file_t appfs_file;
-  var::View appfs_file_reference(appfs_file);
+  file.seek(0)
+      .write(var::View(appfs_file))
+      .seek(location, fs::File::Whence::set);
 
-  int result;
-
-  int location = file.location();
-
-  if (
-    file.seek(0).read(appfs_file_reference).return_value()
-    != (int)appfs_file_reference.size()) {
-    return -1;
-  }
-
-  this->apply(appfs_file_reference.to<appfs_file_t>());
-
-  if (
-    file.seek(0).write(appfs_file_reference).return_value()
-    != (int)appfs_file_reference.size()) {
-    return -1;
-  }
-
-  file.seek(location, fs::File::Whence::set);
-
-  return 0;
+  return *this;
 }
 
 Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)

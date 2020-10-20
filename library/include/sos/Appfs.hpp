@@ -201,8 +201,7 @@ public:
 
     explicit FileAttributes(const appfs_file_t &appfs_file);
 
-    void apply(appfs_file_t *appfs_file) const;
-    int apply(fs::File &file) const;
+    const FileAttributes &apply(const fs::File &file) const;
 
     bool is_flash() const { return m_o_flags & Flags::is_flash; }
     bool is_code_external() const {
@@ -315,18 +314,13 @@ public:
   };
 
   Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_NULLPTR_LAST);
-
   Appfs(FSAPI_LINK_DECLARE_DRIVER_NULLPTR);
-
   Appfs &append(var::View blob);
   bool is_ready() const { return m_bytes_written < m_data_size; }
 
   bool is_valid() const { return m_data_size != 0; }
-
   u32 size() const { return m_data_size - sizeof(appfs_file_t); }
-
   u32 bytes_written() const { return m_bytes_written; }
-
   u32 bytes_available() const { return m_data_size - m_bytes_written; }
 
   class Create {
