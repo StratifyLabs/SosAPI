@@ -19,7 +19,7 @@
 #include "sos/Appfs.hpp"
 #include "sos/Sys.hpp"
 
-namespace linkns {
+namespace sos {
 
 /*! \brief Link for Controlling Stratify OS remotely
  * \details This class is used to access devices
@@ -72,10 +72,12 @@ public:
   public:
     Path() { m_driver = nullptr; }
 
-    Path(const var::String &path, link_transport_mdriver_t *driver) {
+    Path(const var::StringView path, link_transport_mdriver_t *driver) {
+
       if (path.find(host_prefix()) == 0) {
         m_driver = nullptr;
-        m_path = path.get_substring_at_position(host_prefix().length());
+        m_path =
+            var::String(path.get_substring_at_position(host_prefix().length()));
       } else {
         m_driver = driver;
         size_t position;
@@ -84,17 +86,17 @@ public:
         } else {
           position = 0;
         }
-        m_path = path.get_substring_at_position(position);
+        m_path = var::String(path.get_substring_at_position(position));
       }
     }
 
     bool is_valid() const { return !m_path.is_empty(); }
 
-    static bool is_device_path(const var::String &path) {
+    static bool is_device_path(const var::StringView path) {
       return path.find(device_prefix()) == 0;
     }
 
-    static bool is_host_path(const var::String &path) {
+    static bool is_host_path(const var::StringView path) {
       return path.find(host_prefix()) == 0;
     }
 
@@ -145,16 +147,16 @@ public:
   class DriverPath {
   public:
     DriverPath() {}
-    DriverPath(const var::String &driver_path) {
-      path() = driver_path;
-      var::StringList driver_details = m_path.split("@");
-      var::String details_string;
+    DriverPath(const var::StringView driver_path) {
+      set_path(var::String(driver_path));
+      var::StringViewList driver_details = m_path.split("@");
+      var::StringView details_string;
       if (driver_details.count() == 1) {
         driver_name() = "serial";
         set_path(var::String("serial@") + driver_path);
         details_string = driver_path;
       } else if (driver_details.count() == 2) {
-        m_driver_name = driver_details.at(0);
+        m_driver_name = var::String(driver_details.at(0));
         details_string = driver_details.at(1);
       }
 
@@ -163,28 +165,28 @@ public:
       }
 
       if (details_string.find("/dev") == 0) {
-        set_device_path(details_string);
+        set_device_path(var::String(details_string));
         return;
       }
 
       if (details_string.length() && details_string.front() == '/') {
         details_string.pop_front();
       }
-      var::StringList detail_list = details_string.split("/");
+      var::StringViewList detail_list = details_string.split("/");
 
       if (detail_list.count() == 1) {
-        set_device_path(detail_list.at(0));
+        set_device_path(var::String(detail_list.at(0)));
       } else if (detail_list.count() > 2) {
         //<driver>@/<vendor id>/<product id>/<interface number>/<serial
         // number>/<device path>
-        set_vendor_id(detail_list.at(0));
-        set_product_id(detail_list.at(1));
-        set_interface_number(detail_list.at(2));
+        set_vendor_id(var::String(detail_list.at(0)));
+        set_product_id(var::String(detail_list.at(1)));
+        set_interface_number(var::String(detail_list.at(2)));
         if (detail_list.count() > 3) {
-          set_serial_number(detail_list.at(3));
+          set_serial_number(var::String(detail_list.at(3)));
         }
         if (detail_list.count() > 4) {
-          set_device_path(detail_list.at(4));
+          set_device_path(var::String(detail_list.at(4)));
         }
       }
     }
@@ -512,8 +514,8 @@ private:
   void reset_progress();
 };
 
-} // namespace linkns
+} // namespace sos
 
-#endif
+#endif // link
 
 #endif // LINKAPI_LINK_LINK_HPP_

@@ -90,13 +90,13 @@ public:
     bool is_valid() const { return m_info.signature != 0; }
 
     /*! \details Returns the application ID (cloud id). */
-    const var::String id() const {
-      return var::String((const char *)m_info.id);
+    const var::StringView id() const {
+      return var::StringView(reinterpret_cast<const char *>(m_info.id));
     }
 
     /*! \details Returns the name of the application. */
-    const var::String name() const {
-      return var::String((const char *)m_info.name);
+    const var::StringView name() const {
+      return var::StringView(reinterpret_cast<const char *>(m_info.name));
     }
 
     /*! \details Returns the file mode. */
@@ -296,8 +296,8 @@ public:
     }
 
   private:
-    API_ACCESS_COMPOUND(FileAttributes, var::String, name);
-    API_ACCESS_COMPOUND(FileAttributes, var::String, id);
+    API_ACCESS_COMPOUND(FileAttributes, var::StringView, name);
+    API_ACCESS_COMPOUND(FileAttributes, var::StringView, id);
     API_ACCESS_FUNDAMENTAL(FileAttributes, u32, ram_size, 0);
     API_ACCESS_FUNDAMENTAL(FileAttributes, u32, o_flags, Flags::is_flash);
     API_ACCESS_FUNDAMENTAL(FileAttributes, u16, version, 0);
@@ -388,27 +388,6 @@ public:
    *
    */
   Info get_info(var::StringView path);
-
-  /*! \details Gets the application version.
-   *
-   * @param path The path to the file (must be in the /app folder)
-   * @return The BCD version of the file
-   *
-   * For example, the BCD representation of version "1.1" is 0x0101.
-   *
-   */
-  u16 get_version(const var::String &path);
-
-  /*! \details Gets the application ID value.
-   *
-   * @param path The path to the file (must be in the /app folder)
-   * @param id A pointer to the destination data for the ID
-   * @param capacity The number of bytes available in \a id
-   * @return Zero on success
-   *
-   *
-   */
-  var::String get_id(const var::String &path);
 
 #if !defined __link
 

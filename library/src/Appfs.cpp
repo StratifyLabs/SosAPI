@@ -19,18 +19,23 @@ printer::Printer &
 printer::operator<<(printer::Printer &printer, const appfs_file_t &a) {
   printer.key("name", var::StringView(a.hdr.name));
   printer.key("id", var::StringView(a.hdr.id));
-  printer.key("mode", var::NumberString(a.hdr.mode, "0%o"));
-  printer.key(
-    "version",
-    var::String().format("%d.%d", a.hdr.version >> 8, a.hdr.version & 0xff));
-  printer.key("startup", var::NumberString(a.exec.startup, "%p"));
-  printer.key("codeStart", var::NumberString(a.exec.code_start, "%p"));
-  printer.key("codeSize", var::NumberString(a.exec.code_size));
-  printer.key("ramStart", var::NumberString(a.exec.ram_start, "%p"));
-  printer.key("ramSize", var::NumberString(a.exec.ram_size));
-  printer.key("dataSize", var::NumberString(a.exec.data_size));
-  printer.key("oFlags", var::NumberString(a.exec.o_flags, "0x%lX"));
-  printer.key("signature", var::NumberString(a.exec.signature, "0x%08lx"));
+  printer.key("mode", var::NumberString(a.hdr.mode, "0%o").string_view());
+  printer.key("version",
+              var::NumberString()
+                  .format("%d.%d", a.hdr.version >> 8, a.hdr.version & 0xff)
+                  .string_view());
+  printer.key("startup", var::NumberString(a.exec.startup, "%p").string_view());
+  printer.key("codeStart",
+              var::NumberString(a.exec.code_start, "%p").string_view());
+  printer.key("codeSize", var::NumberString(a.exec.code_size).string_view());
+  printer.key("ramStart",
+              var::NumberString(a.exec.ram_start, "%p").string_view());
+  printer.key("ramSize", var::NumberString(a.exec.ram_size).string_view());
+  printer.key("dataSize", var::NumberString(a.exec.data_size).string_view());
+  printer.key("oFlags",
+              var::NumberString(a.exec.o_flags, "0x%lX").string_view());
+  printer.key("signature",
+              var::NumberString(a.exec.signature, "0x%08lx").string_view());
   return printer;
 }
 
@@ -50,22 +55,23 @@ printer::operator<<(printer::Printer &printer,
   printer.key("dataTightlyCoupled", a.is_data_tightly_coupled());
   printer.key("startup", a.is_startup());
   printer.key("unique", a.is_unique());
-  printer.key("ramSize", var::NumberString(a.ram_size()));
+  printer.key("ramSize", var::NumberString(a.ram_size()).string_view());
   return printer;
 }
 
 printer::Printer &printer::operator<<(printer::Printer &printer,
                                       const sos::Appfs::Info &a) {
   printer.key("name", a.name());
-  printer.key("mode", var::NumberString(a.mode(), "0%o"));
+  printer.key("mode", var::NumberString(a.mode(), "0%o").string_view());
   if (a.is_executable()) {
     printer.key("id", a.id());
     printer.key(
       "version",
       var::String().format("%d.%d", a.version() >> 8, a.version() & 0xff));
 
-    printer.key("signature", var::NumberString(a.signature(), F3208X));
-    printer.key("ram", var::NumberString(a.ram_size()));
+    printer.key("signature",
+                var::NumberString(a.signature(), F3208X).string_view());
+    printer.key("ram", var::NumberString(a.ram_size()).string_view());
     printer.key("orphan", a.is_orphan());
     printer.key("flash", a.is_flash());
     printer.key("startup", a.is_startup());
@@ -87,11 +93,17 @@ Appfs::FileAttributes::FileAttributes(const appfs_file_t &appfs_file) {
 void Appfs::FileAttributes::apply(appfs_file_t *appfs_file) const {
 
   if (m_name.is_empty() == false) {
-    memcpy(appfs_file->hdr.name, m_name.cstring(), LINK_NAME_MAX);
+    var::View(appfs_file->hdr.name)
+        .fill<u8>(0)
+        .truncate(LINK_NAME_MAX - 1)
+        .copy(m_name);
   }
 
   if (m_id.is_empty() == false) {
-    memcpy(appfs_file->hdr.id, m_id.cstring(), LINK_NAME_MAX);
+    var::View(appfs_file->hdr.id)
+        .fill<u8>(0)
+        .truncate(LINK_NAME_MAX - 1)
+        .copy(m_id);
   }
 
   if (m_version != 0) {
@@ -468,23 +480,6 @@ Appfs::Info Appfs::get_info(var::StringView path) {
     API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", ENOEXEC);
   }
   return Info(info);
-}
-
-u16 Appfs::get_version(const var::String &path) {
-  Info info;
-  info = get_info(path);
-  return info.version();
-}
-
-var::String Appfs::get_id(const var::String &path) {
-  Info info;
-  info = get_info(path);
-
-  if (info.is_valid() == false) {
-    return var::String();
-  }
-
-  return info.id();
 }
 
 #ifndef __link

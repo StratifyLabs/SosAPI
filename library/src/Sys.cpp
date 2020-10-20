@@ -44,11 +44,10 @@ printer::Printer &printer::operator<<(printer::Printer &printer,
       clock_time.seconds(),
       clock_time.nanoseconds() / 1000UL));
   printer.key("id", id);
-  printer.key("thread", var::NumberString(a.thread_id()));
-  printer.key("pid", var::NumberString(a.pid()));
-  printer.key(
-    "programAddress",
-    var::NumberString(a.program_address(), "0x%lX"));
+  printer.key("thread", var::NumberString(a.thread_id()).string_view());
+  printer.key("pid", var::NumberString(a.pid()).string_view());
+  printer.key("programAddress",
+              var::NumberString(a.program_address(), "0x%lX").string_view());
   printer.key("message", a.message());
   return printer;
 }
@@ -57,7 +56,8 @@ printer::Printer &printer::operator<<(printer::Printer &printer,
                                       const sos::Sys::Info &a) {
   printer.key("name", a.name());
   printer.key("serialNumber", a.serial_number().to_string());
-  printer.key("hardwareId", var::NumberString(a.hardware_id(), F3208X));
+  printer.key("hardwareId",
+              var::NumberString(a.hardware_id(), F3208X).string_view());
   if (a.name() != "bootloader") {
     printer.key("projectId", a.id());
     if (a.team_id().is_empty() == false) {
@@ -66,10 +66,12 @@ printer::Printer &printer::operator<<(printer::Printer &printer,
     printer.key("bspVersion", a.bsp_version());
     printer.key("sosVersion", a.sos_version());
     printer.key("cpuArchitecture", a.cpu_architecture());
-    printer.key("cpuFrequency", var::NumberString(a.cpu_frequency()));
+    printer.key("cpuFrequency",
+                var::NumberString(a.cpu_frequency()).string_view());
+
     printer.key(
-      "applicationSignature",
-      var::NumberString(a.application_signature(), F32X));
+        "applicationSignature",
+        var::NumberString(a.application_signature(), F32X).string_view());
 
     printer.key("bspGitHash", a.bsp_git_hash());
     printer.key("sosGitHash", a.sos_git_hash());
@@ -99,7 +101,7 @@ SerialNumber SerialNumber::from_string(var::StringView str) {
 
 SerialNumber::SerialNumber(var::StringView str) {
   SerialNumber serial_number = from_string(str);
-  memcpy(&m_serial_number, &serial_number.m_serial_number, sizeof(mcu_sn_t));
+  var::View(m_serial_number).copy(var::View(serial_number.m_serial_number));
 }
 
 bool SerialNumber::operator==(const SerialNumber &serial_number) {

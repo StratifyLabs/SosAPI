@@ -2,6 +2,8 @@
              // LICENSE.md for rights.
 /* Copyright 2016-2018 Tyler Gilbert ALl Rights Reserved */
 
+#if defined __link
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -14,12 +16,11 @@
 
 #include "chrono/ClockTimer.hpp"
 #include "fs/File.hpp"
-#include "link/Link.hpp"
-#include "sys/Appfs.hpp"
+#include "sos/Appfs.hpp"
+#include "sos/Link.hpp"
 
-using namespace sys;
 using namespace fs;
-using namespace linkns;
+using namespace sos;
 
 static var::String gen_error(const var::String &msg, int err_number) {
   var::String s;
@@ -98,8 +99,8 @@ int Link::connect(var::StringView path, Legacy is_legacy) {
   if (driver()->phy_driver.handle == LINK_PHY_OPEN_ERROR) {
 
     driver()->transport_version = 0;
-    driver()->phy_driver.handle
-      = driver()->phy_driver.open(path.cstring(), driver()->options);
+    driver()->phy_driver.handle =
+        driver()->phy_driver.open(fs::Path(path).cstring(), driver()->options);
     if (driver()->phy_driver.handle == LINK_PHY_OPEN_ERROR) {
       m_error_message = "Failed to Connect to Device";
       return -1;
@@ -488,7 +489,6 @@ u32 Link::validate_os_image_id_with_connected_bootloader(File *source_image) {
   if (source_image->seek(BOOTLOADER_HARDWARE_ID_OFFSET)
         .read(var::View(image_id))
         .seek(0)
-        .status()
         .is_error()) {
     return 0;
   }
@@ -582,7 +582,7 @@ int Link::install_os(u32 image_id, const UpdateOs &options) {
     return -1;
   }
 
-  if (options.image()->seek(0).status().is_error()) {
+  if (options.image()->seek(0).is_error()) {
     return -1;
   }
 
@@ -603,14 +603,14 @@ int Link::install_os(u32 image_id, const UpdateOs &options) {
     return -1;
   }
 
-  while (options.image()->read(buffer).status().value() > 0) {
-    const int bytes_read = options.image()->status().value();
+  while (options.image()->read(buffer).return_value() > 0) {
+    const int bytes_read = options.image()->return_value();
     if (loc == start_address) {
       // we want to write the first 256 bytes last because the bootloader checks
       // this for a valid image
-      var::View buffer_view
-        = var::View(buffer).reduce_size(start_address_buffer.size());
-      start_address_buffer.copy_contents(buffer_view);
+      var::View buffer_view =
+          var::View(buffer).truncate(start_address_buffer.size());
+      start_address_buffer.copy(buffer_view);
 
       // memcpy(stackaddr, buffer, 256);
 
@@ -652,8 +652,8 @@ int Link::install_os(u32 image_id, const UpdateOs &options) {
 
       options.printer()->progress_key() = "verifying";
 
-      while ((options.image()->read(buffer).status().value()) > 0) {
-        const int bytes_read = options.image()->status().value();
+      while ((options.image()->read(buffer).return_value()) > 0) {
+        const int bytes_read = options.image()->return_value();
 
         if (
           (err
@@ -669,8 +669,8 @@ int Link::install_os(u32 image_id, const UpdateOs &options) {
 
           if (loc == start_address) {
             var::View(buffer)
-              .reduce_size(start_address_buffer.size())
-              .fill<u8>(0xff);
+                .truncate(start_address_buffer.size())
+                .fill<u8>(0xff);
           }
 
           compare_buffer.resize(bytes_read);
@@ -800,3 +800,7 @@ var::String Link::DriverPath::lookup_serial_port_path_from_usb_details() {
 #endif
   return var::String();
 }
+
+#else
+int sos_api_link_unused;
+#endif
