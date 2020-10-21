@@ -61,7 +61,7 @@ public:
   bool operator==(const SerialNumber &serial_number);
 
   /*! \details Converts the serial number to a string. */
-  var::String to_string() const;
+  var::StackString64 to_string() const;
 
   /*! \details Returns a serial number object from a string type. */
   static SerialNumber from_string(var::StringView str);

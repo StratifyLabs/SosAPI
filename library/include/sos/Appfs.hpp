@@ -311,44 +311,24 @@ public:
     API_ACCESS_COMPOUND(Construct, var::StringView, name);
     API_ACCESS_COMPOUND(Construct, var::StringView, mount);
     API_ACCESS_FUNDAMENTAL(Construct, u32, size, 0);
+    API_ACCESS_BOOL(Construct, executable, false);
+    API_ACCESS_BOOL(Construct, overwrite, false);
   };
 
   Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_NULLPTR_LAST);
   Appfs(FSAPI_LINK_DECLARE_DRIVER_NULLPTR);
+
   Appfs &append(var::View blob);
-  bool is_ready() const { return m_bytes_written < m_data_size; }
+  Appfs &append(const fs::File &file,
+                const api::ProgressCallback *progress_callback = nullptr);
+
+  bool is_append_ready() const { return m_bytes_written < m_data_size; }
 
   bool is_valid() const { return m_data_size != 0; }
   u32 size() const { return m_data_size - sizeof(appfs_file_t); }
+
   u32 bytes_written() const { return m_bytes_written; }
   u32 bytes_available() const { return m_data_size - m_bytes_written; }
-
-  class Create {
-  private:
-    API_ACCESS_FUNDAMENTAL(Create, fs::File *, source, nullptr);
-    API_ACCESS_COMPOUND(Create, var::StringView, name);
-    API_ACCESS_COMPOUND(Create, var::StringView, mount);
-    API_ACCESS_FUNDAMENTAL(Create, u32, size, 0);
-    API_ACCESS_FUNDAMENTAL(
-      Create,
-      const api::ProgressCallback *,
-      progress_callback,
-      nullptr);
-  };
-
-  /*! \details Creates a file in flash memory consisting
-   * of the data specified.
-   *
-   * @param name The name of the data file (no path info)
-   * @param buf A pointer to the data to be saved
-   * @param nbyte The number of bytes to save
-   * @param mount The mount path (default is /app)
-   * @param update A callback that is executed after each page write
-   * @param context The first argument passed to the \a update callback
-   * @return Zero on success or -1 with errno set accordingly
-   *
-   */
-  Appfs &create(const Create &options);
 
   /*! \details Returns true if the application
    * filesystem includes flash memory.
@@ -362,8 +342,8 @@ public:
   bool is_ram_available();
 
   /*! \details Returns the page size for writing data. */
-  int page_size() { return APPFS_PAGE_SIZE; }
-  u32 overhead() { return sizeof(appfs_file_t); }
+  static constexpr int page_size() { return APPFS_PAGE_SIZE; }
+  static constexpr u32 overhead() { return sizeof(appfs_file_t); }
 
   /*! \details Gets the info associated with an executable file.
    *
@@ -426,8 +406,9 @@ private:
   appfs_createattr_t m_create_attributes = {0};
   u32 m_bytes_written = 0;
   u32 m_data_size = 0;
+  int m_request = I_APPFS_CREATE;
 
-  int create_asynchronous(const Construct &options);
+  void create_asynchronous(const Construct &options);
 };
 
 } // namespace sos

@@ -331,7 +331,7 @@ public:
    * is not available, the character is replace by a "-".
    *
    */
-  static var::String convert_permissions(link_mode_t mode);
+  static var::StackString32 convert_permissions(link_mode_t mode);
 
   /*! \details Formats the filesystem on the device.
    *
@@ -343,7 +343,7 @@ public:
    *
    * \return The PID of the new process or less than zero for an error
    */
-  int run_app(const var::String &path);
+  int run_app(const var::StringView path);
 
   /*! \details Checks to see if the target is in = mode.
    *
@@ -389,14 +389,11 @@ public:
    */
   int set_time(struct tm *gt);
 
-  enum class IsVerify { no, yes };
-
   class UpdateOs {
-    API_AF(UpdateOs, fs::File *, image, nullptr);
-    API_AF(UpdateOs, IsVerify, verify, IsVerify::no);
-    API_AF(UpdateOs, const api::ProgressCallback *, progress_callback, nullptr);
+    API_AF(UpdateOs, const fs::File *, image, nullptr);
     API_AF(UpdateOs, u32, bootloader_retry_count, 20);
     API_AF(UpdateOs, printer::Printer *, printer, nullptr);
+    API_AB(UpdateOs, verify, false);
   };
 
   /*!
@@ -412,7 +409,10 @@ public:
    * before calling this method.
    *
    */
-  int update_os(const UpdateOs &options);
+  Link &update_os(const UpdateOs &options);
+  inline Link &operator()(const UpdateOs &options) {
+    return update_os(options);
+  }
 
   /*! \details Returns the driver needed by other API objects.
    *
@@ -504,7 +504,8 @@ private:
 
   link_transport_mdriver_t m_driver_instance = {0};
 
-  u32 validate_os_image_id_with_connected_bootloader(fs::File *source_image);
+  u32 validate_os_image_id_with_connected_bootloader(
+      const fs::File *source_image);
 
   int erase_os(const UpdateOs &options);
 

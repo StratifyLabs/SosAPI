@@ -10,7 +10,7 @@
 namespace sos {
 
 #if !defined __link
-class Sos : public api::Object {
+class Sos : public api::ExecutionContext {
 public:
   /*! \details Resets the device. */
   void reset();

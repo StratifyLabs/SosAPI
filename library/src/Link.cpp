@@ -306,8 +306,8 @@ int Link::set_time(struct tm *gt) {
   return check_error(err);
 }
 
-var::String Link::convert_permissions(link_mode_t mode) {
-  var::String result;
+var::StackString32 Link::convert_permissions(link_mode_t mode) {
+  var::StackString32 result;
 
   link_mode_t type;
   type = mode & LINK_S_IFMT;
@@ -332,63 +332,63 @@ var::String Link::convert_permissions(link_mode_t mode) {
   }
 
   if (mode & LINK_S_IROTH) {
-    result += "r";
+    result.append("r");
   } else {
-    result += "-";
+    result.append("-");
   }
 
   if (mode & LINK_S_IWOTH) {
-    result += "w";
+    result.append("w");
   } else {
-    result += "-";
+    result.append("-");
   }
 
   if (mode & LINK_S_IXOTH) {
-    result += "x";
+    result.append("x");
   } else {
-    result += "-";
+    result.append("-");
   }
 
   if (mode & LINK_S_IRGRP) {
-    result += "r";
+    result.append("r");
   } else {
-    result += "-";
+    result.append("-");
   }
 
   if (mode & LINK_S_IWGRP) {
-    result += "w";
+    result.append("w");
   } else {
-    result += "-";
+    result.append("-");
   }
 
   if (mode & LINK_S_IXGRP) {
-    result += "x";
+    result.append("x");
   } else {
-    result += "-";
+    result.append("-");
   }
 
   if (mode & LINK_S_IRUSR) {
-    result += "r";
+    result.append("r");
   } else {
-    result += "-";
+    result.append("-");
   }
 
   if (mode & LINK_S_IWUSR) {
-    result += "w";
+    result.append("w");
   } else {
-    result += "-";
+    result.append("-");
   }
 
   if (mode & LINK_S_IXUSR) {
-    result += "x";
+    result.append("x");
   } else {
-    result += "-";
+    result.append("-");
   }
 
   return result;
 }
 
-int Link::run_app(const var::String &path) {
+int Link::run_app(const var::StringView path) {
   int err = -1;
   if (is_bootloader()) {
     return -1;
@@ -400,7 +400,7 @@ int Link::run_app(const var::String &path) {
   }
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
-    err = link_exec(driver(), path.cstring());
+    err = link_exec(driver(), fs::Path(path).cstring());
     if (err != LINK_PROT_ERROR)
       break;
   }
@@ -411,11 +411,7 @@ int Link::run_app(const var::String &path) {
       this->disconnect();
       return -2;
     } else {
-      m_error_message.format(
-        "Failed to run program -> %s (%d, %d)",
-        path.cstring(),
-        err,
-        link_errno);
+
       return -1;
     }
   }
@@ -473,7 +469,8 @@ int Link::get_bootloader_attr(bootloader_attr_t &attr) {
   return 0;
 }
 
-u32 Link::validate_os_image_id_with_connected_bootloader(File *source_image) {
+u32 Link::validate_os_image_id_with_connected_bootloader(
+    const File *source_image) {
   int err = -1;
   u32 image_id;
 
@@ -511,7 +508,8 @@ int Link::erase_os(const UpdateOs &options) {
     return -1;
   }
 
-  const api::ProgressCallback *progress_callback = options.progress_callback();
+  const api::ProgressCallback *progress_callback =
+      options.printer()->progress_callback();
 
   options.printer()->progress_key() = "erasing";
 
@@ -644,7 +642,7 @@ int Link::install_os(u32 image_id, const UpdateOs &options) {
 
   if (err == 0) {
 
-    if (options.verify() == IsVerify::yes) {
+    if (options.is_verify()) {
 
       options.image()->seek(0);
       loc = start_address;
@@ -725,7 +723,7 @@ int Link::install_os(u32 image_id, const UpdateOs &options) {
       return -1;
     }
 
-    if (options.verify() == IsVerify::yes) {
+    if (options.is_verify()) {
       // verify the stack address
       buffer.resize(start_address_buffer.size());
       if (
@@ -761,7 +759,7 @@ int Link::install_os(u32 image_id, const UpdateOs &options) {
   return check_error(err);
 }
 
-int Link::update_os(const UpdateOs &options) {
+Link &Link::update_os(const UpdateOs &options) {
 
   API_ASSERT(options.image() != nullptr);
   API_ASSERT(options.printer() != nullptr);
@@ -770,7 +768,7 @@ int Link::update_os(const UpdateOs &options) {
     = validate_os_image_id_with_connected_bootloader(options.image());
 
   if (image_id == 0) {
-    return -1;
+    return *this;
   }
 
   var::String progress_key = var::String(options.printer()->progress_key());
@@ -779,18 +777,16 @@ int Link::update_os(const UpdateOs &options) {
     options.printer()->error(
       var::String("failed to erase os ") + error_message());
     options.printer()->progress_key() = progress_key;
-    return -1;
+    return *this;
   }
 
   if (install_os(image_id, options) < 0) {
     options.printer()->error(
       var::String("failed to install os ") + error_message());
-    options.printer()->progress_key() = progress_key;
-    return -1;
   }
 
   options.printer()->progress_key() = progress_key;
-  return 0;
+  return *this;
 }
 
 var::String Link::DriverPath::lookup_serial_port_path_from_usb_details() {

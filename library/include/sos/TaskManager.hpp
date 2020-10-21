@@ -149,73 +149,23 @@ public:
   };
 
   TaskManager(FSAPI_LINK_DECLARE_DRIVER_NULLPTR);
-
   ~TaskManager();
 
-  /*! \details Sets the task ID value for the get_next() method.
-   *
-   * Valid values from from 0 to count_total() - 1.
-   *
-   *
-   */
-  TaskManager &set_id(u32 value) {
-    m_id = value;
-    return *this;
-  }
-
-  /*! \details Returns the index of the current task as
-   * this object goes through all tasks using get_next().
-   *
-   * Use sos::Thread::self() to get the id
-   * of the currently executing thread.
-   *
-   *
-   *
-   *
-   */
-  int id() const { return m_id; }
-
-  /*! \details Gets the attributes for the next task.
-   *
-   * @param attr A reference for the destination information.
-   *
-   * @return
-   *  - Zero if there are no more tasks
-   *  - One if the task was successfully read
-   *  - less than zero for an error readin the task
-   *
-   */
-  TaskManager &get_next(Info &attr);
-
-  /*! \details Gets the task attributes for the specifed id.
-   *
-   *
-   * The code below gets the task information for the
-   * currently executing thread.
-   *
-   * \code
-   * #include <sapi/sys.hpp>
-   *
-   * Info info;
-   * Task task;
-   *
-   * info = task(Thread::self());
-   * \endcode
-   *
-   */
   Info get_info(u32 id) const;
+  var::Vector<Info> get_info();
 
   /*! \details Prints info for all enabled tasks. */
   void print(int pid = -1);
 
-  static int get_pid(const var::StringView name);
-  static bool is_pid_running(pid_t pid);
-  static int count_total();
-  static int count_free();
+  int get_pid(const var::StringView name);
+  bool is_pid_running(pid_t pid);
+  int count_total();
+  int count_free();
+
+  const TaskManager &kill_pid(int pid, int signo) const;
 
 private:
   fs::File m_sys_device;
-  int m_id = -1;
 };
 
 } // namespace sos

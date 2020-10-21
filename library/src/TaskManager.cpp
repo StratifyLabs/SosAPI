@@ -15,7 +15,7 @@ printer::Printer &printer::operator<<(printer::Printer &printer,
   printer.key("priority", var::NumberString(a.priority()).string_view());
   printer.key("priorityCeiling",
               var::NumberString(a.priority_ceiling()).string_view());
-  printer.key("isThread", a.is_thread());
+  printer.key_bool("isThread", a.is_thread());
   if (a.is_thread() == false) {
     printer.key("heap", var::NumberString(a.heap(), "0x%lX").string_view());
     printer.key("heapSize", var::NumberString(a.heap_size()).string_view());
@@ -27,82 +27,87 @@ using namespace sos;
 
 TaskManager::TaskManager(FSAPI_LINK_DECLARE_DRIVER)
     : m_sys_device("/dev/sys",
-                   fs::OpenMode::read_write() FSAPI_LINK_INHERIT_DRIVER_LAST) {
-  m_id = 0;
-}
+                   fs::OpenMode::read_write() FSAPI_LINK_INHERIT_DRIVER_LAST) {}
 
 int TaskManager::count_total() {
-  TaskManager task_manager;
-  Info info;
   int count = 0;
-  while (task_manager.get_next(info).id() > 0) {
-    count++;
+  while (is_success()) {
+    get_info(count++);
   }
+  API_RESET_ERROR();
   return count;
 }
 
 int TaskManager::count_free() {
-  TaskManager task_manager;
   Info info;
   int count = 0;
-  while (task_manager.get_next(info).id() > 0) {
+  int total_count = 0;
+  while (is_success()) {
+    info = get_info(total_count++);
     if (!info.is_enabled()) {
       count++;
     }
   }
+  API_RESET_ERROR();
   return count;
-}
-
-TaskManager &TaskManager::get_next(Info &info) {
-  API_RETURN_VALUE_IF_ERROR(*this);
-  sys_taskattr_t task_attr;
-  task_attr.tid = m_id;
-  API_SYSTEM_CALL("",
-                  m_sys_device.ioctl(I_SYS_GETTASK, &task_attr).return_value());
-
-  if (is_error()) {
-    // it is normal for an error when the id exceeds the number available
-    API_RESET_ERROR();
-    m_id = 0;
-    info = Info::invalid();
-  } else {
-    m_id++;
-    info = task_attr;
-  }
-
-  return *this;
 }
 
 TaskManager::Info TaskManager::get_info(u32 id) const {
   API_RETURN_VALUE_IF_ERROR(Info());
-  sys_taskattr_t attr;
+  sys_taskattr_t attr = {0};
   attr.tid = id;
-  if (API_SYSTEM_CALL(
-          "", m_sys_device.ioctl(I_SYS_GETTASK, &attr).return_value()) < 0) {
-    return Info::invalid();
-  }
-
+  API_SYSTEM_CALL("", m_sys_device.ioctl(I_SYS_GETTASK, &attr).return_value());
   return Info(attr);
 }
 
+var::Vector<TaskManager::Info> TaskManager::get_info() {
+  int task_count = count_total();
+  var::Vector<Info> result;
+  result.reserve(task_count);
+  int id = 0;
+  while (is_success()) {
+    result.push_back(get_info(id++));
+  }
+  API_RESET_ERROR();
+  if (result.count()) {
+    result.pop_back();
+  }
+  return result;
+}
+
 bool TaskManager::is_pid_running(pid_t pid) {
-  TaskManager task_manager;
   Info info;
-  while (task_manager.get_next(info).id() > 0) {
+  int id = 0;
+  while (is_success()) {
+    info = get_info(id++);
     if ((static_cast<u32>(pid) == info.pid()) && info.is_enabled()) {
       return true;
     }
   }
+  API_RESET_ERROR();
   return false;
 }
 
 int TaskManager::get_pid(const var::StringView name) {
-  TaskManager task_manager;
   Info info;
-  while (task_manager.get_next(info).id() > 0) {
+  int id = 0;
+  while (is_success()) {
+    info = get_info(id++);
     if (name == info.name() && info.is_enabled()) {
       return info.pid();
     }
   }
   return -1;
+}
+
+const TaskManager &TaskManager::kill_pid(int pid, int signo) const {
+  API_RETURN_VALUE_IF_ERROR(*this);
+  API_SYSTEM_CALL("",
+#if defined __link
+                  link_kill_pid(m_sys_device.driver(), pid, signo)
+#else
+                  ::kill(pid, signo)
+#endif
+  );
+  return *this;
 }
