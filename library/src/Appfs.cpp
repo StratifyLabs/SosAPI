@@ -8,12 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "fs/Dir.hpp"
-#include "fs/File.hpp"
-#include "fs/FileSystem.hpp"
-#include "printer/Printer.hpp"
+#include <fs.hpp>
+#include <printer/Printer.hpp>
+#include <var.hpp>
+
 #include "sos/Appfs.hpp"
-#include "var/String.hpp"
 
 printer::Printer &
 printer::operator<<(printer::Printer &printer, const appfs_file_t &a) {
@@ -311,7 +310,7 @@ Appfs::Info Appfs::get_info(var::StringView path) {
   if (result == sizeof(appfs_file_header)) {
     // first check to see if the name matches -- otherwise it isn't an app
     // file
-    const var::StringView path_name = fs::Path(path).name();
+    const var::StringView path_name = fs::Path::name(path);
 
     if (path_name.find(".sys") == 0) {
       API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", EINVAL);
