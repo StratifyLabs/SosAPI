@@ -15,6 +15,7 @@
 #include "Trace.hpp"
 #include "chrono/DateTime.hpp"
 #include "fs/File.hpp"
+#include "var/StackString.hpp"
 
 namespace sos {
 
@@ -61,7 +62,7 @@ public:
   bool operator==(const SerialNumber &serial_number);
 
   /*! \details Converts the serial number to a string. */
-  var::StackString64 to_string() const;
+  var::KeyString to_string() const;
 
   /*! \details Returns a serial number object from a string type. */
   static SerialNumber from_string(var::StringView str);

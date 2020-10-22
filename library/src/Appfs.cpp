@@ -140,8 +140,9 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
     : m_file("/app/.install",
              fs::OpenMode::write_only() FSAPI_LINK_INHERIT_DRIVER_LAST) {
 
-  fs::Path path = fs::Path(options.mount()) / "flash" / options.name();
-  fs::FileSystem(FSAPI_LINK_MEMBER_DRIVER).remove(path);
+  const var::PathString path =
+      var::PathString(options.mount()) / "flash" / options.name();
+  fs::FileSystem(FSAPI_LINK_MEMBER_DRIVER).remove(path.string_view());
 
   if (options.is_executable() == false) {
     m_request = I_APPFS_CREATE;

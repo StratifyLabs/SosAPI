@@ -112,10 +112,10 @@ bool SerialNumber::operator==(const SerialNumber &serial_number) {
          == 0;
 }
 
-var::StackString64 SerialNumber::to_string() const {
-  return var::StackString64().format(
-      F3208X F3208X F3208X F3208X, m_serial_number.sn[3], m_serial_number.sn[2],
-      m_serial_number.sn[1], m_serial_number.sn[0]);
+var::KeyString SerialNumber::to_string() const {
+  return var::KeyString().format(F3208X F3208X F3208X F3208X,
+                                 m_serial_number.sn[3], m_serial_number.sn[2],
+                                 m_serial_number.sn[1], m_serial_number.sn[0]);
 }
 
 Sys::Sys(FSAPI_LINK_DECLARE_DRIVER)

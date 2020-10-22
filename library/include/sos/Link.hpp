@@ -38,7 +38,7 @@ public:
   class Info {
   public:
     Info() {}
-    Info(const var::String &path, const sos::Sys::Info &sys_info) {
+    Info(const var::StringView path, const sos::Sys::Info &sys_info) {
       set_path(path);
       set_info(sys_info);
     }
@@ -49,8 +49,8 @@ public:
       m_sys_info.clear();
     }
 
-    Info &set_port(var::StringView port) {
-      m_path = var::String(port);
+    Info &set_port(const var::StringView port) {
+      m_path = port;
       return *this;
     }
 
@@ -60,12 +60,12 @@ public:
       return *this;
     }
 
-    const var::String &port() const { return m_path; }
+    const var::StringView port() const { return m_path.string_view(); }
 
   private:
-    API_ACCESS_COMPOUND(Info, var::String, path);
+    API_ACCESS_COMPOUND(Info, var::PathString, path);
     API_READ_ACCESS_COMPOUND(Info, sos::Sys::Info, sys_info);
-    API_READ_ACCESS_COMPOUND(Info, var::String, serial_number);
+    API_READ_ACCESS_COMPOUND(Info, var::KeyString, serial_number);
   };
 
   class Path {
@@ -331,7 +331,7 @@ public:
    * is not available, the character is replace by a "-".
    *
    */
-  static var::StackString32 convert_permissions(link_mode_t mode);
+  static var::KeyString convert_permissions(link_mode_t mode);
 
   /*! \details Formats the filesystem on the device.
    *
@@ -470,9 +470,9 @@ public:
    * @return A string containing the serial number of the last connected (or
    * currently connected) device
    */
-  var::StringView serial_number() const { return m_link_info.serial_number(); }
-
-  var::StringView serial_no() const { return serial_number(); }
+  var::StringView serial_number() const {
+    return m_link_info.serial_number().string_view();
+  }
 
   /*! \details The path of the currently connected (or last connected) device */
   var::StringView path() const { return m_link_info.port(); }

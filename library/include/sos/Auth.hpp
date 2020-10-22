@@ -34,7 +34,7 @@ public:
   public:
     Token() { m_auth_token = {0}; }
     explicit Token(const auth_token_t &auth_token) : m_auth_token(auth_token) {}
-    explicit Token(const var::String &token);
+    explicit Token(const var::StringView token);
     explicit Token(var::View token);
 
     bool is_valid() const {

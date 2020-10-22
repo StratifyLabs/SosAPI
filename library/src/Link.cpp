@@ -12,12 +12,14 @@
 #include <sstream>
 #include <string>
 
-#define MAX_TRIES 3
+#include <chrono.hpp>
+#include <fs.hpp>
+#include <var.hpp>
 
-#include "chrono/ClockTimer.hpp"
-#include "fs/File.hpp"
 #include "sos/Appfs.hpp"
 #include "sos/Link.hpp"
+
+#define MAX_TRIES 3
 
 using namespace fs;
 using namespace sos;
@@ -99,8 +101,10 @@ int Link::connect(var::StringView path, Legacy is_legacy) {
   if (driver()->phy_driver.handle == LINK_PHY_OPEN_ERROR) {
 
     driver()->transport_version = 0;
+    const var::PathString path_string(path);
+
     driver()->phy_driver.handle =
-        driver()->phy_driver.open(fs::Path(path).cstring(), driver()->options);
+        driver()->phy_driver.open(path_string.cstring(), driver()->options);
     if (driver()->phy_driver.handle == LINK_PHY_OPEN_ERROR) {
       m_error_message = "Failed to Connect to Device";
       return -1;
@@ -306,8 +310,8 @@ int Link::set_time(struct tm *gt) {
   return check_error(err);
 }
 
-var::StackString32 Link::convert_permissions(link_mode_t mode) {
-  var::StackString32 result;
+var::KeyString Link::convert_permissions(link_mode_t mode) {
+  var::KeyString result;
 
   link_mode_t type;
   type = mode & LINK_S_IFMT;
@@ -400,7 +404,7 @@ int Link::run_app(const var::StringView path) {
   }
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
-    err = link_exec(driver(), fs::Path(path).cstring());
+    err = link_exec(driver(), PathString(path).cstring());
     if (err != LINK_PROT_ERROR)
       break;
   }

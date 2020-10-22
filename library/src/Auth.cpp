@@ -19,7 +19,7 @@
 
 using namespace sos;
 
-Auth::Token::Token(const var::String &token) {
+Auth::Token::Token(const var::StringView token) {
   populate(var::Data::from_string(token));
 }
 
