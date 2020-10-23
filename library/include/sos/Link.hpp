@@ -263,10 +263,6 @@ public:
 
   var::Vector<Info> get_info_list();
 
-  /*! \details Gets the error message if an operation fails.
-   */
-  const var::String &error_message() const { return m_error_message; }
-
   /*! \details Gets the current progress of an operation.  This allows
    * multi-threaded applications to update a progress bar while copying files.
    */
@@ -277,35 +273,13 @@ public:
    */
   int progress_max() const { return m_progress_max; }
 
-
-  /*! \details Connects to the specified Stratify OS device. After calling this,
-   * other applications will not have access to the device.
-   *
-   * @param path The path to the serial device
-   * @param serial_number The serial number to connect to
-   * @param is_legacy True if connected to older devices
-   *
-   */
   Link &connect(var::StringView path, IsLegacy is_legacy = IsLegacy::no);
-
-  /*! \details Reconnects to the last known path and serial number. */
-  Link &reinit() { return connect(path()); }
-
+  Link &reinitialize() { return connect(path()); }
   Link &reconnect(int retries = 5, chrono::MicroTime delay = 500_milliseconds);
-
-  /*! \details This disconnects from the device.  After calling this,
-   * other applications can access the device.
-   */
   Link &disconnect();
-
-  /*! \details Sets the object to a disconnected state
-   * without interacting with the hardware.
-   *
-   * This can be called if the device was removed without
-   * being properly disconnected in software.
-   *
-   */
   Link &set_disconnected();
+
+  bool ping(const var::StringView path);
 
   /*! \details Returns true if the device is connected.
    */
@@ -314,77 +288,25 @@ public:
 
   // These are all the file transfer options over Stratify OS Link
 
-  /*! \details Converts the permissions to a
-   * string of the format:
-   *
-   * -rwxrwxrwx
-   *
-   * The first character indicates:
-   * - - File
-   * - d Directory
-   * - c Character file
-   * - b Block file
-   *
-   * The order is other, group, user.  If the permission
-   * is not available, the character is replace by a "-".
-   *
-   */
   static var::KeyString convert_permissions(link_mode_t mode);
 
-  /*! \details Formats the filesystem on the device.
-   *
-   * \return Zero on success
-   */
-  Link &format(const var::String &path); // Format the drive
-
-  /*! \details Funs an application on the target device.
-   *
-   * \return The PID of the new process or less than zero for an error
-   */
+  Link &format(const var::StringView path); // Format the drive
   Link &run_app(const var::StringView path);
 
-  /*! \details Checks to see if the target is in = mode.
-   *
-   * \return Non zero if = mode is active.
-   */
+  Link &reset();
+  Link &reset_bootloader();
+  Link &get_bootloader_attr(bootloader_attr_t &attr);
   bool is_bootloader() const { return m_is_bootloader == IsBootloader::yes; }
-
   bool is_connected_and_is_not_bootloader() const {
     return is_connected() && !is_bootloader();
   }
 
   bool is_legacy() const { return m_is_legacy == IsLegacy::yes; }
 
-  /*! \details Resets the device (connection will be terminated).
-   *
-   * \return Zero on success or less than zero on error
-   */
-  Link &reset();
-
-  /*! \details Resets the device and invokes the bootloader.
-   *
-   * \return Zero on success or less than zero on error
-   *
-   * The connection to the device is terminated with this call.
-   *
-   */
-  Link &reset_bootloader();
-
   Link &write_flash(int addr, const void *buf, int nbyte);
   Link &read_flash(int addr, void *buf, int nbyte);
-  Link &get_bootloader_attr(bootloader_attr_t &attr);
 
-  /*! \details Reads the time from
-   * the device.
-   *
-   * \return Zero on success
-   *
-   */
   Link &get_time(struct tm *gt);
-
-  /*! \details This function sets the time on the device.
-   * \return Zero on success
-   */
   Link &set_time(struct tm *gt);
 
   class UpdateOs {
@@ -394,61 +316,19 @@ public:
     API_AB(UpdateOs, verify, false);
   };
 
-  /*!
-   * \details Updates the operating system.
-   *
-   * \param path Path to the new binary image on the host.
-   * \param verify true to read back the installation
-   * \param update Callback to execute as update is in progress
-   * \param context Argument to pass to the update callback
-   * \return Zero on success
-   *
-   * The host must be connected to the target bootloader
-   * before calling this method.
-   *
-   */
   Link &update_os(const UpdateOs &options);
   inline Link &operator()(const UpdateOs &options) {
     return update_os(options);
   }
 
-  /*! \details Returns the driver needed by other API objects.
-   *
-   * Other objects need the link driver in order to operate correctly.
-   * If the driver is not provided, the program will crash.
-   *
-   * Consider the following example:
-   *
-   * \code
-   * #include <sapi/sys.hpp>
-   *
-   * Link link;
-   *
-   * link.connect("path_to_device", "serial_number");
-   *
-   * File file(link.driver()); //allows File to open a file on the target using
-   * this link driver File crash_file; //any operations use this will cause the
-   * program to crash
-   *
-   * \endcode
-   *
-   */
   const link_transport_mdriver_t *driver() const { return &m_driver_instance; }
   link_transport_mdriver_t *driver() { return &m_driver_instance; }
 
-  /*! \details Assigns the driver options to the link driver.
-   *
-   */
   Link &set_driver_options(const void *options) {
     m_driver_instance.options = options;
     return *this;
   }
 
-  /*! \details Sets the driver used by this object.
-   *
-   * If no driver is set, the default driver (serial port) is used.
-   *
-   */
   Link &set_driver(link_transport_mdriver_t *driver) {
     m_driver_instance = *driver;
     return *this;
@@ -463,25 +343,12 @@ public:
     return *this;
   }
 
-  /*! \details Returns the serial number of the last device
-   * that was connected (including the currently connected device)
-   * @return A string containing the serial number of the last connected (or
-   * currently connected) device
-   */
   var::StringView serial_number() const {
     return m_link_info.serial_number().string_view();
   }
 
-  /*! \details The path of the currently connected (or last connected) device */
   var::StringView path() const { return m_link_info.port(); }
 
-  /*! \details Returns a copy of the system info for the
-   * connected device.
-   *
-   * Each time a device is connected, the system information
-   * is loaded. This object keeps a copy.
-   *
-   */
   const sos::Sys::Info &sys_info() const { return m_link_info.sys_info(); }
 
   const Info &info() const { return m_link_info; }

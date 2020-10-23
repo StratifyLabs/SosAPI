@@ -232,6 +232,15 @@ bool Link::is_connected() const {
   return true;
 }
 
+bool Link::ping(const var::StringView path) {
+  API_RETURN_VALUE_IF_ERROR(false);
+  int result = link_ping(driver(), var::PathString(path).cstring(), 0, 0);
+  if (result >= 0) {
+    return true;
+  }
+  return false;
+}
+
 Link &Link::get_time(struct tm *gt) {
   API_RETURN_VALUE_IF_ERROR(*this);
   int err = -1;
@@ -398,7 +407,7 @@ Link &Link::run_app(const var::StringView path) {
   return *this;
 }
 
-Link &Link::format(const var::String &path) {
+Link &Link::format(const var::StringView path) {
   API_RETURN_VALUE_IF_ERROR(*this);
   int err = -1;
   if (is_bootloader()) {
@@ -408,7 +417,7 @@ Link &Link::format(const var::String &path) {
   // Format the filesystem
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
-    err = link_mkfs(driver(), path.cstring());
+    err = link_mkfs(driver(), PathString(path).cstring());
     if (err != LINK_PROT_ERROR)
       break;
   }

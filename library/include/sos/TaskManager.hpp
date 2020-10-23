@@ -61,7 +61,7 @@ public:
 
     bool is_valid() const { return m_value.tid != static_cast<u32>(-1); }
 
-    Info &set_name(var::StringView name) {
+    Info &set_name(const var::StringView name) {
       var::View(m_value.name)
           .fill<u8>(0)
           .truncate(sizeof(m_value.name) - 1)
