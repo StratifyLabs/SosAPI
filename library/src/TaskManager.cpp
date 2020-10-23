@@ -25,6 +25,8 @@ printer::Printer &printer::operator<<(printer::Printer &printer,
 
 using namespace sos;
 
+TaskManager::TaskManager(IsNull is_null) : m_sys_device() {}
+
 TaskManager::TaskManager(FSAPI_LINK_DECLARE_DRIVER)
     : m_sys_device("/dev/sys",
                    fs::OpenMode::read_write() FSAPI_LINK_INHERIT_DRIVER_LAST) {}

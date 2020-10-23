@@ -148,7 +148,9 @@ public:
     sys_taskattr_t m_value;
   };
 
-  TaskManager() = default;
+  using IsNull = fs::File::IsNull;
+
+  TaskManager(IsNull is_null);
   TaskManager(FSAPI_LINK_DECLARE_DRIVER_NULLPTR);
   ~TaskManager();
 
