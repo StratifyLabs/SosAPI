@@ -1,6 +1,6 @@
 
 
-set(DEPENDENCIES SosAPI SysAPI TestAPI FsAPI )
+set(DEPENDENCIES SosAPI SysAPI TestAPI FsAPI CryptoAPI)
 
 stratify_api_add_test_executable(SosAPI 32768 "${DEPENDENCIES}")
 

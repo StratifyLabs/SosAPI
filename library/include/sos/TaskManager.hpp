@@ -152,7 +152,6 @@ public:
 
   TaskManager(IsNull is_null);
   TaskManager(FSAPI_LINK_DECLARE_DRIVER_NULLPTR);
-  ~TaskManager();
 
   TaskManager(const TaskManager &a) = delete;
   TaskManager &operator=(const TaskManager &a) = delete;

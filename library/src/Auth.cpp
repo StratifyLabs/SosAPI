@@ -3,8 +3,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "crypto/Random.hpp"
-#include "crypto/Sha256.hpp"
+#include <crypto/Random.hpp>
+#include <crypto/Sha256.hpp>
+
 #include "sos/Auth.hpp"
 
 #if defined __link

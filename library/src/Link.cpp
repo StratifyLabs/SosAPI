@@ -430,6 +430,17 @@ Link &Link::format(const var::StringView path) {
   return *this;
 }
 
+Link &Link::reset() {
+  API_RETURN_VALUE_IF_ERROR(*this);
+
+  API_SYSTEM_CALL("", link_reset(driver()));
+
+  driver()->transport_version = 0;
+  driver()->phy_driver.handle = LINK_PHY_OPEN_ERROR;
+
+  return *this;
+}
+
 Link &Link::reset_bootloader() {
   API_RETURN_VALUE_IF_ERROR(*this);
 

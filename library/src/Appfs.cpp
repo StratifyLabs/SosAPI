@@ -135,6 +135,12 @@ Appfs::FileAttributes::apply(const fs::File &file) const {
   return *this;
 }
 
+Appfs::Appfs(FSAPI_LINK_DECLARE_DRIVER) {
+#if defined __link
+  set_driver(link_driver);
+#endif
+}
+
 Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
     : m_file("/app/.install",
              fs::OpenMode::write_only() FSAPI_LINK_INHERIT_DRIVER_LAST) {
