@@ -34,66 +34,52 @@ Link::Link() { link_load_default_driver(driver()); }
 
 Link::~Link() {}
 
-int Link::check_error(int err) {
-  switch (err) {
-  case LINK_PHY_ERROR:
-    m_error_message = "Physical Connection Error";
-    this->disconnect();
-    return LINK_PHY_ERROR;
-  case LINK_PROT_ERROR:
-    m_error_message = "Protocol Error";
-    return LINK_PROT_ERROR;
-  }
-  return err;
-}
-
-void Link::reset_progress() {
+Link &Link::reset_progress() {
   m_progress = 0;
   m_progress_max = 0;
+  return *this;
 }
 
-var::Vector<var::String> Link::get_path_list() {
-  var::Vector<var::String> result;
-  var::Data device_name(256);
-  var::String last_device;
+fs::PathList Link::get_path_list() {
+  fs::PathList result;
+  PathString device_name;
+  PathString last_device;
 
-  while (driver()->getname(
-           var::View(device_name).to_char(),
-           last_device.cstring(),
-           static_cast<int>(device_name.capacity()))
-         == 0) {
+  while (driver()->getname(device_name.to_char(), last_device.cstring(),
+                           static_cast<int>(device_name.capacity())) == 0) {
 
-    var::String device_string(var::View(device_name).to_const_char());
-
-    result.push_back(device_string); // this will make a copy of device name and
-                                     // put it on the list
-    last_device = device_string;
+    result.push_back(device_name); // this will make a copy of device name and
+                                   // put it on the list
+    last_device = device_name;
   }
 
-  return result;
+  return std::move(result);
 }
 
 var::Vector<Link::Info> Link::get_info_list() {
   var::Vector<Info> result;
-  var::Vector<var::String> port_list = get_path_list();
+  fs::PathList port_list = get_path_list();
 
   // disconnect if already connected
   disconnect();
 
   for (u32 i = 0; i < port_list.count(); i++) {
     // ping and grab the info
-    if (connect(port_list.at(i)) < 0) {
-      // couldn't connect
-    } else {
+    connect(port_list.at(i));
+    // couldn't connect
+    if (is_success()) {
       result.push_back(Info(port_list.at(i), sys_info()));
       disconnect();
+    } else {
+      API_RESET_ERROR();
     }
   }
 
   return result;
 }
 
-int Link::connect(var::StringView path, Legacy is_legacy) {
+Link &Link::connect(var::StringView path, IsLegacy is_legacy) {
+  API_RETURN_VALUE_IF_ERROR(*this);
   int err = -1;
 
   reset_progress();
@@ -103,24 +89,19 @@ int Link::connect(var::StringView path, Legacy is_legacy) {
     driver()->transport_version = 0;
     const var::PathString path_string(path);
 
-    driver()->phy_driver.handle =
-        driver()->phy_driver.open(path_string.cstring(), driver()->options);
-    if (driver()->phy_driver.handle == LINK_PHY_OPEN_ERROR) {
-      m_error_message = "Failed to Connect to Device";
-      return -1;
-    }
+    driver()->phy_driver.handle = API_SYSTEM_CALL_NULL(
+        path_string.cstring(),
+        driver()->phy_driver.open(path_string.cstring(), driver()->options));
 
-  } else {
-    m_error_message.format("Already Connected (%d)", 1);
-    return -1;
+    API_RETURN_VALUE_IF_ERROR(*this);
   }
 
   m_is_legacy = is_legacy;
 
-  if (m_is_legacy == Legacy::yes) {
-    err = link_isbootloader_legacy(driver());
+  if (m_is_legacy == IsLegacy::yes) {
+    err = API_SYSTEM_CALL("", link_isbootloader_legacy(driver()));
   } else {
-    err = link_isbootloader(driver());
+    err = API_SYSTEM_CALL("", link_isbootloader(driver()));
   }
 
   if (err > 0) {
@@ -128,11 +109,9 @@ int Link::connect(var::StringView path, Legacy is_legacy) {
   } else if (err == 0) {
     m_is_bootloader = IsBootloader::no;
   } else {
-    m_error_message.format(
-      "Failed to check for Bootloader status (%d)",
-      link_errno);
+
     driver()->phy_driver.close(&driver()->phy_driver.handle);
-    return -1;
+    return *this;
   }
 
   sys_info_t sys_info;
@@ -151,29 +130,29 @@ int Link::connect(var::StringView path, Legacy is_legacy) {
 
   m_link_info.set_port(path).set_info(Sys::Info(sys_info));
 
-  return 0;
+  return *this;
 }
 
-int Link::reconnect(int retries, chrono::MicroTime delay) {
-  int result;
+Link &Link::reconnect(int retries, chrono::MicroTime delay) {
+  API_RETURN_VALUE_IF_ERROR(*this);
   Info last_info(info());
   for (u32 i = 0; i < retries; i++) {
-    result = connect(last_info.port());
-    if (result >= 0) {
+    connect(last_info.port());
+
+    if (is_success()) {
       if (last_info.serial_number() == info().serial_number()) {
-        return 0;
+        return *this;
       }
       disconnect();
     }
 
-    var::Vector<var::String> port_list = get_path_list();
+    fs::PathList port_list = get_path_list();
     for (u32 j = 0; j < port_list.count(); j++) {
-      result = connect(port_list.at(j));
-      if (result < 0) {
-        // didn't connect
-      } else {
+      connect(port_list.at(j));
+
+      if (is_success()) {
         if (last_info.serial_number() == info().serial_number()) {
-          return 0;
+          return *this;
         }
         disconnect();
       }
@@ -185,10 +164,11 @@ int Link::reconnect(int retries, chrono::MicroTime delay) {
   // restore the last known information on failure
   m_link_info = last_info;
 
-  return -1;
+  return *this;
 }
 
-int Link::read_flash(int addr, void *buf, int nbyte) {
+Link &Link::read_flash(int addr, void *buf, int nbyte) {
+  API_RETURN_VALUE_IF_ERROR(*this);
   int err = -1;
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
@@ -200,10 +180,11 @@ int Link::read_flash(int addr, void *buf, int nbyte) {
     m_error_message.format("Failed to read flash", link_errno);
   }
 
-  return check_error(err);
+  return *this;
 }
 
-int Link::write_flash(int addr, const void *buf, int nbyte) {
+Link &Link::write_flash(int addr, const void *buf, int nbyte) {
+  API_RETURN_VALUE_IF_ERROR(*this);
   int err = -1;
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
@@ -214,11 +195,11 @@ int Link::write_flash(int addr, const void *buf, int nbyte) {
   if (err < 0) {
     m_error_message.format("Failed to write flash", link_errno);
   }
-
-  return check_error(err);
+  return *this;
 }
 
-int Link::disconnect() {
+Link &Link::disconnect() {
+  API_RETURN_VALUE_IF_ERROR(*this);
 
   if (driver()->phy_driver.handle != LINK_PHY_OPEN_ERROR) {
     link_disconnect(driver());
@@ -232,15 +213,18 @@ int Link::disconnect() {
   m_error_message = "";
   m_stdout_fd = -1;
   m_stdin_fd = -1;
-  return 0;
+  return *this;
 }
 
-void Link::set_disconnected() {
+Link &Link::set_disconnected() {
+  API_RETURN_VALUE_IF_ERROR(*this);
   driver()->transport_version = 0;
   driver()->phy_driver.handle = LINK_PHY_OPEN_ERROR;
+  return *this;
 }
 
 bool Link::is_connected() const {
+  API_RETURN_VALUE_IF_ERROR(false);
   if (driver()->phy_driver.handle == LINK_PHY_OPEN_ERROR) {
     return false;
   }
@@ -248,11 +232,12 @@ bool Link::is_connected() const {
   return true;
 }
 
-int Link::get_time(struct tm *gt) {
+Link &Link::get_time(struct tm *gt) {
+  API_RETURN_VALUE_IF_ERROR(*this);
   int err = -1;
   struct link_tm ltm;
   if (is_bootloader()) {
-    return -1;
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
   }
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
@@ -262,7 +247,7 @@ int Link::get_time(struct tm *gt) {
   }
 
   if (err < 0) {
-    m_error_message.format("Failed to Get Time", link_errno);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", link_errno);
   } else {
     gt->tm_hour = ltm.tm_hour;
     gt->tm_isdst = ltm.tm_isdst;
@@ -274,10 +259,11 @@ int Link::get_time(struct tm *gt) {
     gt->tm_yday = ltm.tm_yday;
     gt->tm_year = ltm.tm_year;
   }
-  return check_error(err);
+  return *this;
 }
 
-int Link::set_time(struct tm *gt) {
+Link &Link::set_time(struct tm *gt) {
+  API_RETURN_VALUE_IF_ERROR(*this);
   int err = -1;
   struct link_tm ltm;
 
@@ -293,7 +279,7 @@ int Link::set_time(struct tm *gt) {
 
   if (is_bootloader()) {
     m_error_message.format("can't set time for bootloader");
-    return -1;
+    return *this;
   }
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
@@ -302,15 +288,11 @@ int Link::set_time(struct tm *gt) {
       break;
   }
 
-  if (err < 0) {
-    m_error_message.format(
-      "failed to set time with device errno %d",
-      link_errno);
-  }
-  return check_error(err);
+  return *this;
 }
 
 var::KeyString Link::convert_permissions(link_mode_t mode) {
+  API_RETURN_VALUE_IF_ERROR(var::KeyString());
   var::KeyString result;
 
   link_mode_t type;
@@ -392,15 +374,15 @@ var::KeyString Link::convert_permissions(link_mode_t mode) {
   return result;
 }
 
-int Link::run_app(const var::StringView path) {
+Link &Link::run_app(const var::StringView path) {
+  API_RETURN_VALUE_IF_ERROR(*this);
   int err = -1;
   if (is_bootloader()) {
-    return -1;
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
   }
 
   if (path.length() >= LINK_PATH_ARG_MAX - 1) {
-    m_error_message = "Path argument exceeds max";
-    return -1;
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
   }
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
@@ -410,22 +392,17 @@ int Link::run_app(const var::StringView path) {
   }
 
   if (err < 0) {
-    if (err == LINK_TRANSFER_ERR) {
-      m_error_message = "Connection Failed";
-      this->disconnect();
-      return -2;
-    } else {
-
-      return -1;
-    }
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", link_errno);
   }
-  return err;
+
+  return *this;
 }
 
-int Link::format(const var::String &path) {
+Link &Link::format(const var::String &path) {
+  API_RETURN_VALUE_IF_ERROR(*this);
   int err = -1;
   if (is_bootloader()) {
-    return -1;
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
   }
   m_error_message = "";
   // Format the filesystem
@@ -441,23 +418,24 @@ int Link::format(const var::String &path) {
       "failed to format filesystem with device errno %d",
       link_errno);
   }
-  return check_error(err);
+  return *this;
 }
 
-int Link::reset_bootloader() {
+Link &Link::reset_bootloader() {
+  API_RETURN_VALUE_IF_ERROR(*this);
 
   link_resetbootloader(driver());
 
   driver()->transport_version = 0;
   driver()->phy_driver.handle = LINK_PHY_OPEN_ERROR;
-  return 0;
+  return *this;
 }
 
-int Link::get_bootloader_attr(bootloader_attr_t &attr) {
+Link &Link::get_bootloader_attr(bootloader_attr_t &attr) {
+  API_RETURN_VALUE_IF_ERROR(*this);
   int err = -1;
   if (!is_bootloader()) {
-    m_error_message = "Target is not a bootloader";
-    return -1;
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
   }
 
   if (is_legacy()) {
@@ -465,16 +443,13 @@ int Link::get_bootloader_attr(bootloader_attr_t &attr) {
   } else {
     err = link_bootloader_attr(driver(), &attr, 0);
   }
-  if (err < 0) {
-    m_error_message = "Failed to read attributes";
-    return -1;
-  }
 
-  return 0;
+  return *this;
 }
 
 u32 Link::validate_os_image_id_with_connected_bootloader(
     const File *source_image) {
+  API_RETURN_VALUE_IF_ERROR(0);
   int err = -1;
   u32 image_id;
 
@@ -504,12 +479,12 @@ u32 Link::validate_os_image_id_with_connected_bootloader(
   return image_id;
 }
 
-int Link::erase_os(const UpdateOs &options) {
+Link &Link::erase_os(const UpdateOs &options) {
+  API_RETURN_VALUE_IF_ERROR(*this);
   int err;
 
   if (!is_bootloader()) {
-    m_error_message = "Target is not a bootloader";
-    return -1;
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
   }
 
   const api::ProgressCallback *progress_callback =
@@ -529,8 +504,7 @@ int Link::erase_os(const UpdateOs &options) {
     if (progress_callback) {
       progress_callback->update(0, 0);
     }
-    m_error_message = "Failed to erase flash";
-    return check_error(err);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
   }
 
   bootloader_attr_t attr;
@@ -538,7 +512,8 @@ int Link::erase_os(const UpdateOs &options) {
   int retry = 0;
   do {
     chrono::wait(500_milliseconds);
-    err = get_bootloader_attr(attr);
+    get_bootloader_attr(attr);
+
     if (progress_callback) {
       progress_callback->update(
         retry,
@@ -556,17 +531,14 @@ int Link::erase_os(const UpdateOs &options) {
   }
 
   if (err < 0) {
-    var::String error = m_error_message;
-    m_error_message.format(
-      "Failed to ping bootloader after erase -> %s",
-      error.cstring());
-    return err;
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
   }
 
-  return 0;
+  return *this;
 }
 
-int Link::install_os(u32 image_id, const UpdateOs &options) {
+Link &Link::install_os(u32 image_id, const UpdateOs &options) {
+  API_RETURN_VALUE_IF_ERROR(*this);
 
   // must be connected to the bootloader with an erased OS
   int err = -1;
@@ -580,12 +552,11 @@ int Link::install_os(u32 image_id, const UpdateOs &options) {
   var::Data compare_buffer(buffer_size);
 
   if (!is_bootloader()) {
-    m_error_message = "Target is not a bootloader";
-    return -1;
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
   }
 
   if (options.image()->seek(0).is_error()) {
-    return -1;
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
   }
 
   u32 start_address = m_bootloader_attributes.startaddr;
@@ -600,10 +571,9 @@ int Link::install_os(u32 image_id, const UpdateOs &options) {
   var::View(buffer).fill<u8>(0xff);
 
   bootloader_attr_t attr;
-  if (get_bootloader_attr(attr) < 0) {
-    m_error_message = "failed to get bootloader attributes before write";
-    return -1;
-  }
+  get_bootloader_attr(attr);
+
+  API_RETURN_VALUE_IF_ERROR(*this);
 
   while (options.image()->read(buffer).return_value() > 0) {
     const int bytes_read = options.image()->return_value();
@@ -679,7 +649,7 @@ int Link::install_os(u32 image_id, const UpdateOs &options) {
           buffer.resize(bytes_read);
 
           if (var::View(compare_buffer) != var::View(buffer)) {
-            return -1;
+            API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
           }
 
           loc += bytes_read;
@@ -716,15 +686,8 @@ int Link::install_os(u32 image_id, const UpdateOs &options) {
         progress_callback->update(0, 0);
       }
 
-      m_error_message.format(
-        "Failed to write %d bytes to first block 0x%x (%d, %d)",
-        start_address_buffer.size(),
-        start_address,
-        SYSFS_GET_RETURN(err),
-        SYSFS_GET_RETURN_ERRNO(err));
-
       link_eraseflash(driver());
-      return -1;
+      API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
     }
 
     if (options.is_verify()) {
@@ -737,21 +700,19 @@ int Link::install_os(u32 image_id, const UpdateOs &options) {
            buffer.data(),
            start_address_buffer.size()))
         != start_address_buffer.size()) {
-        m_error_message.format("Failed to write stack addr %d", err);
         if (progress_callback) {
           progress_callback->update(0, 0);
         }
 
-        return -1;
+        API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
       }
 
       if (var::View(buffer) != var::View(start_address_buffer)) {
-        m_error_message = "Failed to verify stack address block";
         if (progress_callback) {
           progress_callback->update(0, 0);
         }
         link_eraseflash(driver());
-        return -1;
+        API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
       }
     }
   }
@@ -760,10 +721,11 @@ int Link::install_os(u32 image_id, const UpdateOs &options) {
     progress_callback->update(0, 0);
   }
 
-  return check_error(err);
+  return *this;
 }
 
 Link &Link::update_os(const UpdateOs &options) {
+  API_RETURN_VALUE_IF_ERROR(*this);
 
   API_ASSERT(options.image() != nullptr);
   API_ASSERT(options.printer() != nullptr);
@@ -777,17 +739,8 @@ Link &Link::update_os(const UpdateOs &options) {
 
   var::String progress_key = var::String(options.printer()->progress_key());
 
-  if (erase_os(options)) {
-    options.printer()->error(
-      var::String("failed to erase os ") + error_message());
-    options.printer()->progress_key() = progress_key;
-    return *this;
-  }
-
-  if (install_os(image_id, options) < 0) {
-    options.printer()->error(
-      var::String("failed to install os ") + error_message());
-  }
+  erase_os(options);
+  install_os(image_id, options);
 
   options.printer()->progress_key() = progress_key;
   return *this;

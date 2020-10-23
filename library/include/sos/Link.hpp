@@ -12,6 +12,7 @@
 #include "api/api.hpp"
 
 #include "fs/Dir.hpp"
+#include "fs/FileSystem.hpp"
 #include "printer/Printer.hpp"
 #include "var/String.hpp"
 #include "var/Vector.hpp"
@@ -33,7 +34,7 @@ namespace sos {
  *
  *
  */
-class Link {
+class Link : public api::ExecutionContext {
 public:
   class Info {
   public:
@@ -100,24 +101,24 @@ public:
       return path.find(host_prefix()) == 0;
     }
 
-    static var::String device_prefix() { return var::String("device@"); }
+    static var::StringView device_prefix() { return "device@"; }
 
-    static var::String host_prefix() { return var::String("host@"); }
+    static var::StringView host_prefix() { return "host@"; }
 
-    var::String path_description() const {
-      return (m_driver ? var::String("device@") : var::String("host@"))
-             + m_path;
+    var::PathString path_description() const {
+      return var::PathString(m_driver ? device_prefix() : host_prefix()) +=
+             m_path;
     }
 
     bool is_device_path() const { return m_driver != nullptr; }
 
     bool is_host_path() const { return m_driver == nullptr; }
 
-    var::String prefix() const {
+    var::StringView prefix() const {
       return is_host_path() ? host_prefix() : device_prefix();
     }
 
-    const var::String &path() const { return m_path; }
+    const var::StringView path() const { return m_path.string_view(); }
 
     link_transport_mdriver_t *driver() const { return m_driver; }
 
@@ -152,7 +153,7 @@ public:
       var::StringViewList driver_details = m_path.split("@");
       var::StringView details_string;
       if (driver_details.count() == 1) {
-        driver_name() = "serial";
+        set_driver_name("serial");
         set_path(var::String("serial@") + driver_path);
         details_string = driver_path;
       } else if (driver_details.count() == 2) {
@@ -236,13 +237,13 @@ public:
     }
 
   private:
-    API_ACCESS_COMPOUND(DriverPath, var::String, path);
-    API_ACCESS_COMPOUND(DriverPath, var::String, device_path);
-    API_ACCESS_COMPOUND(DriverPath, var::String, serial_number);
-    API_ACCESS_COMPOUND(DriverPath, var::String, interface_number);
-    API_ACCESS_COMPOUND(DriverPath, var::String, vendor_id);
-    API_ACCESS_COMPOUND(DriverPath, var::String, product_id);
-    API_ACCESS_COMPOUND(DriverPath, var::String, driver_name);
+    API_ACCESS_STRING(DriverPath, path);
+    API_ACCESS_STRING(DriverPath, device_path);
+    API_ACCESS_STRING(DriverPath, serial_number);
+    API_ACCESS_STRING(DriverPath, interface_number);
+    API_ACCESS_STRING(DriverPath, vendor_id);
+    API_ACCESS_STRING(DriverPath, product_id);
+    API_ACCESS_STRING(DriverPath, driver_name);
 
     var::String lookup_serial_port_path_from_usb_details();
   };
@@ -250,18 +251,15 @@ public:
   Link();
   ~Link();
 
-  enum class Legacy { no, yes };
+  enum class IsLegacy { no, yes };
   enum class IsBootloader { no, yes };
 
-  var::Vector<var::String> get_path_list();
-  var::Vector<var::String> get_port_list() { return get_path_list(); }
+  fs::PathList get_path_list();
 
-  /*! \cond */
   typedef struct {
     var::String port;
     sos::Sys::Info sys_info;
   } port_device_t;
-  /*! \endcond */
 
   var::Vector<Info> get_info_list();
 
@@ -288,17 +286,17 @@ public:
    * @param is_legacy True if connected to older devices
    *
    */
-  int connect(var::StringView path, Legacy is_legacy = Legacy::no);
+  Link &connect(var::StringView path, IsLegacy is_legacy = IsLegacy::no);
 
   /*! \details Reconnects to the last known path and serial number. */
-  int reinit() { return connect(path()); }
+  Link &reinit() { return connect(path()); }
 
-  int reconnect(int retries = 5, chrono::MicroTime delay = 500_milliseconds);
+  Link &reconnect(int retries = 5, chrono::MicroTime delay = 500_milliseconds);
 
   /*! \details This disconnects from the device.  After calling this,
    * other applications can access the device.
    */
-  int disconnect();
+  Link &disconnect();
 
   /*! \details Sets the object to a disconnected state
    * without interacting with the hardware.
@@ -307,7 +305,7 @@ public:
    * being properly disconnected in software.
    *
    */
-  void set_disconnected();
+  Link &set_disconnected();
 
   /*! \details Returns true if the device is connected.
    */
@@ -337,13 +335,13 @@ public:
    *
    * \return Zero on success
    */
-  int format(const var::String &path); // Format the drive
+  Link &format(const var::String &path); // Format the drive
 
   /*! \details Funs an application on the target device.
    *
    * \return The PID of the new process or less than zero for an error
    */
-  int run_app(const var::StringView path);
+  Link &run_app(const var::StringView path);
 
   /*! \details Checks to see if the target is in = mode.
    *
@@ -355,13 +353,13 @@ public:
     return is_connected() && !is_bootloader();
   }
 
-  bool is_legacy() const { return m_is_legacy == Legacy::yes; }
+  bool is_legacy() const { return m_is_legacy == IsLegacy::yes; }
 
   /*! \details Resets the device (connection will be terminated).
    *
    * \return Zero on success or less than zero on error
    */
-  int reset();
+  Link &reset();
 
   /*! \details Resets the device and invokes the bootloader.
    *
@@ -370,11 +368,11 @@ public:
    * The connection to the device is terminated with this call.
    *
    */
-  int reset_bootloader();
+  Link &reset_bootloader();
 
-  int write_flash(int addr, const void *buf, int nbyte);
-  int read_flash(int addr, void *buf, int nbyte);
-  int get_bootloader_attr(bootloader_attr_t &attr);
+  Link &write_flash(int addr, const void *buf, int nbyte);
+  Link &read_flash(int addr, void *buf, int nbyte);
+  Link &get_bootloader_attr(bootloader_attr_t &attr);
 
   /*! \details Reads the time from
    * the device.
@@ -382,12 +380,12 @@ public:
    * \return Zero on success
    *
    */
-  int get_time(struct tm *gt);
+  Link &get_time(struct tm *gt);
 
   /*! \details This function sets the time on the device.
    * \return Zero on success
    */
-  int set_time(struct tm *gt);
+  Link &set_time(struct tm *gt);
 
   class UpdateOs {
     API_AF(UpdateOs, const fs::File *, image, nullptr);
@@ -497,7 +495,7 @@ private:
   volatile int m_progress_max = 0;
   volatile int m_lock = 0;
   IsBootloader m_is_bootloader = IsBootloader::no;
-  Legacy m_is_legacy = Legacy::no;
+  IsLegacy m_is_legacy = IsLegacy::no;
 
   Info m_link_info;
   bootloader_attr_t m_bootloader_attributes = {0};
@@ -507,12 +505,11 @@ private:
   u32 validate_os_image_id_with_connected_bootloader(
       const fs::File *source_image);
 
-  int erase_os(const UpdateOs &options);
+  Link &erase_os(const UpdateOs &options);
 
-  int install_os(u32 image_id, const UpdateOs &options);
+  Link &install_os(u32 image_id, const UpdateOs &options);
 
-  int check_error(int err);
-  void reset_progress();
+  Link &reset_progress();
 };
 
 } // namespace sos

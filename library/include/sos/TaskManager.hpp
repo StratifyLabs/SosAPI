@@ -148,8 +148,18 @@ public:
     sys_taskattr_t m_value;
   };
 
+  TaskManager() = default;
   TaskManager(FSAPI_LINK_DECLARE_DRIVER_NULLPTR);
   ~TaskManager();
+
+  TaskManager(const TaskManager &a) = delete;
+  TaskManager &operator=(const TaskManager &a) = delete;
+
+  TaskManager(TaskManager &&a) { std::swap(m_sys_device, a.m_sys_device); }
+  TaskManager &operator=(TaskManager &&a) {
+    std::swap(m_sys_device, a.m_sys_device);
+    return *this;
+  }
 
   Info get_info(u32 id) const;
   var::Vector<Info> get_info();
