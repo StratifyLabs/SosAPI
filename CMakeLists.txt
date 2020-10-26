@@ -8,6 +8,8 @@ set(CMAKE_MODULE_PATH ${SOS_SDK_PATH}/Tools/gcc/cmake)
 set(CMAKE_TOOLCHAIN_FILE ${CMAKE_MODULE_PATH}/sos-toolchain.cmake)
 include(sos-sdk)
 
+
+include(targets/UsbAPI)
 include(targets/CryptoAPI)
 
 set(LOCAL_NAME SosAPI)

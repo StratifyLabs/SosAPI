@@ -1,15 +1,17 @@
 ﻿
 #include <cstdio>
 
-#include "chrono.hpp"
-#include "fs.hpp"
-#include "printer.hpp"
-#include "sys.hpp"
-#include "var.hpp"
+#include <chrono.hpp>
+#include <fs.hpp>
+#include <printer.hpp>
+#include <sys.hpp>
+#include <test/Test.hpp>
+#include <var.hpp>
+
+#include <usb/usb_link_transport_driver.h>
 
 #include "sos.hpp"
 
-#include "test/Test.hpp"
 
 class UnitTest : public test::Test {
 public:
@@ -20,6 +22,19 @@ public:
     TEST_ASSERT(link_case());
     TEST_ASSERT(link_path_case());
     TEST_ASSERT(link_driver_path_case());
+
+    return true;
+  }
+
+  bool link_case() {
+
+    Link link;
+
+    usb_link_transport_load_driver(link.driver());
+
+    auto list = link.get_info_list();
+
+    TEST_ASSERT(list.count() > 0);
 
     return true;
   }
@@ -89,13 +104,6 @@ public:
       Link::Path path;
       TEST_ASSERT(path.is_valid() == false);
     }
-
-    return true;
-  }
-
-  bool link_case() {
-
-    Link link;
 
     return true;
   }

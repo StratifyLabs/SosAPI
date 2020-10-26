@@ -201,7 +201,7 @@ public:
 
     explicit FileAttributes(const appfs_file_t &appfs_file);
 
-    const FileAttributes &apply(const fs::File &file) const;
+    const FileAttributes &apply(const fs::FileObject &file) const;
 
     bool is_flash() const { return m_o_flags & Flags::is_flash; }
     bool is_code_external() const {
@@ -319,8 +319,9 @@ public:
   Appfs(FSAPI_LINK_DECLARE_DRIVER_NULLPTR);
 
   Appfs &append(var::View blob);
-  Appfs &append(const fs::File &file,
-                const api::ProgressCallback *progress_callback = nullptr);
+  Appfs &append(
+    const fs::FileObject &file,
+    const api::ProgressCallback *progress_callback = nullptr);
 
   bool is_append_ready() const { return m_bytes_written < m_data_size; }
 

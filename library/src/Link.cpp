@@ -24,12 +24,6 @@
 using namespace fs;
 using namespace sos;
 
-static var::String gen_error(const var::String &msg, int err_number) {
-  var::String s;
-  s.format("%s (%d)", msg.cstring(), err_number);
-  return s;
-}
-
 Link::Link() { link_load_default_driver(driver()); }
 
 Link::~Link() {}

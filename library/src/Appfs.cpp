@@ -90,7 +90,7 @@ Appfs::FileAttributes::FileAttributes(const appfs_file_t &appfs_file) {
 }
 
 const Appfs::FileAttributes &
-Appfs::FileAttributes::apply(const fs::File &file) const {
+Appfs::FileAttributes::apply(const fs::FileObject &file) const {
   appfs_file_t appfs_file;
 
   int location = file.location();
@@ -176,8 +176,9 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
   }
 }
 
-Appfs &Appfs::append(const fs::File &file,
-                     const api::ProgressCallback *progress_callback) {
+Appfs &Appfs::append(
+  const fs::FileObject &file,
+  const api::ProgressCallback *progress_callback) {
   var::Array<char, APPFS_PAGE_SIZE> buffer;
   var::View(buffer).fill(0);
   size_t bytes_written = 0;
