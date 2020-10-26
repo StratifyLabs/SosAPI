@@ -32,6 +32,7 @@ public:
 
     usb_link_transport_load_driver(link.driver());
 
+    link_set_debug(0);
     auto list = link.get_info_list();
 
     TEST_ASSERT(list.count() > 0);

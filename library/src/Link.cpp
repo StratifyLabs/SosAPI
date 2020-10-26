@@ -39,14 +39,16 @@ fs::PathList Link::get_path_list() {
   PathString device_name;
   PathString last_device;
 
-  while (driver()->getname(device_name.to_char(), last_device.cstring(),
-                           static_cast<int>(device_name.capacity())) == 0) {
+  while (driver()->getname(
+           device_name.to_char(),
+           last_device.cstring(),
+           static_cast<int>(device_name.capacity()))
+         == 0) {
 
-    result.push_back(device_name); // this will make a copy of device name and
-                                   // put it on the list
+    // this will make a copy of device name and put it on the list
+    result.push_back(device_name);
     last_device = device_name;
   }
-
   return std::move(result);
 }
 
@@ -60,6 +62,7 @@ var::Vector<Link::Info> Link::get_info_list() {
   for (u32 i = 0; i < port_list.count(); i++) {
     // ping and grab the info
     connect(port_list.at(i));
+
     // couldn't connect
     if (is_success()) {
       result.push_back(Info(port_list.at(i), info().sys_info()));
@@ -103,7 +106,6 @@ Link &Link::connect(var::StringView path, IsLegacy is_legacy) {
   } else if (err == 0) {
     m_is_bootloader = IsBootloader::no;
   } else {
-
     driver()->phy_driver.close(&driver()->phy_driver.handle);
     return *this;
   }
@@ -191,6 +193,7 @@ Link &Link::disconnect() {
   API_RETURN_VALUE_IF_ERROR(*this);
 
   if (driver()->phy_driver.handle != LINK_PHY_OPEN_ERROR) {
+    printf("%s():%d\n", __FUNCTION__, __LINE__);
     link_disconnect(driver());
 
     if (driver()->phy_driver.handle != LINK_PHY_OPEN_ERROR) {
@@ -448,7 +451,7 @@ Link &Link::get_bootloader_attr(bootloader_attr_t &attr) {
 }
 
 u32 Link::validate_os_image_id_with_connected_bootloader(
-    const File *source_image) {
+  const FileObject *source_image) {
   API_RETURN_VALUE_IF_ERROR(0);
   int err = -1;
   u32 image_id;

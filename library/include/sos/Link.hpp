@@ -322,7 +322,7 @@ public:
   Link &set_time(struct tm *gt);
 
   class UpdateOs {
-    API_AF(UpdateOs, const fs::File *, image, nullptr);
+    API_AF(UpdateOs, const fs::FileObject *, image, nullptr);
     API_AF(UpdateOs, u32, bootloader_retry_count, 20);
     API_AF(UpdateOs, printer::Printer *, printer, nullptr);
     API_AB(UpdateOs, verify, false);
@@ -373,7 +373,7 @@ private:
   link_transport_mdriver_t m_driver_instance = {0};
 
   u32 validate_os_image_id_with_connected_bootloader(
-    const fs::File *source_image);
+    const fs::FileObject *source_image);
 
   Link &erase_os(const UpdateOs &options);
   Link &install_os(u32 image_id, const UpdateOs &options);
