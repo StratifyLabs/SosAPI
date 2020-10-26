@@ -68,7 +68,7 @@ var::Vector<Link::Info> Link::get_info_list() {
     connect(port_list.at(i));
     // couldn't connect
     if (is_success()) {
-      result.push_back(Info(port_list.at(i), sys_info()));
+      result.push_back(Info(port_list.at(i), info().sys_info()));
       disconnect();
     } else {
       API_RESET_ERROR();
@@ -176,9 +176,6 @@ Link &Link::read_flash(int addr, void *buf, int nbyte) {
     if (err != LINK_PROT_ERROR)
       break;
   }
-  if (err < 0) {
-    m_error_message.format("Failed to read flash", link_errno);
-  }
 
   return *this;
 }
@@ -192,9 +189,7 @@ Link &Link::write_flash(int addr, const void *buf, int nbyte) {
     if (err != LINK_PROT_ERROR)
       break;
   }
-  if (err < 0) {
-    m_error_message.format("Failed to write flash", link_errno);
-  }
+
   return *this;
 }
 
@@ -210,9 +205,6 @@ Link &Link::disconnect() {
   }
 
   m_is_bootloader = IsBootloader::no;
-  m_error_message = "";
-  m_stdout_fd = -1;
-  m_stdin_fd = -1;
   return *this;
 }
 
@@ -287,7 +279,7 @@ Link &Link::set_time(struct tm *gt) {
   ltm.tm_year = gt->tm_year;
 
   if (is_bootloader()) {
-    m_error_message.format("can't set time for bootloader");
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
     return *this;
   }
 
@@ -413,7 +405,6 @@ Link &Link::format(const var::StringView path) {
   if (is_bootloader()) {
     API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
   }
-  m_error_message = "";
   // Format the filesystem
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
@@ -422,11 +413,6 @@ Link &Link::format(const var::StringView path) {
       break;
   }
 
-  if (err < 0) {
-    m_error_message.format(
-      "failed to format filesystem with device errno %d",
-      link_errno);
-  }
   return *this;
 }
 
@@ -474,7 +460,6 @@ u32 Link::validate_os_image_id_with_connected_bootloader(
   u32 image_id;
 
   if (!is_bootloader()) {
-    m_error_message = "Target is not a bootloader";
     return 0;
   }
 
@@ -612,12 +597,7 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
     if (
       (err = link_writeflash(driver(), loc, buffer.data(), bytes_read))
       != bytes_read) {
-      m_error_message.format(
-        "Failed to write to link flash at 0x%x (%d, %d) -> try the operation "
-        "again",
-        loc,
-        err,
-        link_errno);
+
       if (err < 0) {
         err = -1;
       }
@@ -651,7 +631,6 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
           (err
            = link_readflash(driver(), loc, compare_buffer.data(), bytes_read))
           != bytes_read) {
-          m_error_message.format("Failed to read flash memory", link_errno);
           if (err > 0) {
             err = -1;
           }
