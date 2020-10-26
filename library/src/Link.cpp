@@ -21,12 +21,30 @@
 
 #define MAX_TRIES 3
 
+namespace printer {
+class Printer;
+Printer &operator<<(Printer &printer, const sos::Link::Info &a) {
+  printer.key("path", a.path());
+  printer.key("port", a.port());
+  printer.object("systemInformation", a.sys_info());
+  return printer;
+}
+
+Printer &operator<<(Printer &printer, const sos::Link::InfoList &a) {
+  int i = 0;
+  for (const auto &info : a) {
+    printer.object(var::NumberString(i++), info);
+  }
+  return printer;
+}
+} // namespace printer
+
 using namespace fs;
 using namespace sos;
 
 Link::Link() { link_load_default_driver(driver()); }
 
-Link::~Link() {}
+Link::~Link() { disconnect(); }
 
 Link &Link::reset_progress() {
   m_progress = 0;
@@ -54,18 +72,19 @@ fs::PathList Link::get_path_list() {
 
 var::Vector<Link::Info> Link::get_info_list() {
   var::Vector<Info> result;
-  fs::PathList port_list = get_path_list();
+  fs::PathList path_list = get_path_list();
 
   // disconnect if already connected
   disconnect();
 
-  for (u32 i = 0; i < port_list.count(); i++) {
+  for (const auto &path : path_list) {
     // ping and grab the info
-    connect(port_list.at(i));
+
+    connect(path);
 
     // couldn't connect
     if (is_success()) {
-      result.push_back(Info(port_list.at(i), info().sys_info()));
+      result.push_back(Info(path, info().sys_info()));
       disconnect();
     } else {
       API_RESET_ERROR();
@@ -75,26 +94,19 @@ var::Vector<Link::Info> Link::get_info_list() {
   return result;
 }
 
-Link &Link::connect(var::StringView path, IsLegacy is_legacy) {
-  API_RETURN_VALUE_IF_ERROR(*this);
-  int err = -1;
-
-  reset_progress();
-
+Link::Connection Link::ping_connection(const var::StringView path) {
   if (driver()->phy_driver.handle == LINK_PHY_OPEN_ERROR) {
-
     driver()->transport_version = 0;
     const var::PathString path_string(path);
 
     driver()->phy_driver.handle = API_SYSTEM_CALL_NULL(
-        path_string.cstring(),
-        driver()->phy_driver.open(path_string.cstring(), driver()->options));
+      path_string.cstring(),
+      driver()->phy_driver.open(path_string.cstring(), driver()->options));
 
-    API_RETURN_VALUE_IF_ERROR(*this);
+    API_RETURN_VALUE_IF_ERROR(Connection::null);
   }
 
-  m_is_legacy = is_legacy;
-
+  int err;
   if (m_is_legacy == IsLegacy::yes) {
     err = API_SYSTEM_CALL("", link_isbootloader_legacy(driver()));
   } else {
@@ -102,12 +114,38 @@ Link &Link::connect(var::StringView path, IsLegacy is_legacy) {
   }
 
   if (err > 0) {
-    m_is_bootloader = IsBootloader::yes;
+    return Connection::bootloader;
   } else if (err == 0) {
-    m_is_bootloader = IsBootloader::no;
-  } else {
-    driver()->phy_driver.close(&driver()->phy_driver.handle);
+    return Connection::os;
+  }
+
+  driver()->phy_driver.close(&driver()->phy_driver.handle);
+  return Connection::null;
+}
+
+Link &Link::connect(var::StringView path, IsLegacy is_legacy) {
+  API_RETURN_VALUE_IF_ERROR(*this);
+  int err = -1;
+
+  if (is_connected() && info().path() != path) {
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
+  }
+
+  reset_progress();
+
+  m_is_legacy = is_legacy;
+
+  Connection connection = ping_connection(path);
+
+  switch (connection) {
+  case Connection::null:
     return *this;
+  case Connection::bootloader:
+    m_is_bootloader = IsBootloader::yes;
+    break;
+  case Connection::os:
+    m_is_bootloader = IsBootloader::no;
+    break;
   }
 
   sys_info_t sys_info;
@@ -193,7 +231,6 @@ Link &Link::disconnect() {
   API_RETURN_VALUE_IF_ERROR(*this);
 
   if (driver()->phy_driver.handle != LINK_PHY_OPEN_ERROR) {
-    printf("%s():%d\n", __FUNCTION__, __LINE__);
     link_disconnect(driver());
 
     if (driver()->phy_driver.handle != LINK_PHY_OPEN_ERROR) {
@@ -205,29 +242,28 @@ Link &Link::disconnect() {
   return *this;
 }
 
-Link &Link::set_disconnected() {
-  API_RETURN_VALUE_IF_ERROR(*this);
+Link &Link::disregard_connection() {
   driver()->transport_version = 0;
   driver()->phy_driver.handle = LINK_PHY_OPEN_ERROR;
   return *this;
 }
 
 bool Link::is_connected() const {
-  API_RETURN_VALUE_IF_ERROR(false);
   if (driver()->phy_driver.handle == LINK_PHY_OPEN_ERROR) {
     return false;
   }
-
   return true;
 }
 
 bool Link::ping(const var::StringView path) {
   API_RETURN_VALUE_IF_ERROR(false);
-  int result = link_ping(driver(), var::PathString(path).cstring(), 0, 0);
-  if (result >= 0) {
-    return true;
+  Connection connection = ping_connection(path);
+  if (connection == Connection::null) {
+    API_RESET_ERROR();
+    return false;
   }
-  return false;
+
+  return true;
 }
 
 Link &Link::get_time(struct tm *gt) {
@@ -416,10 +452,15 @@ Link &Link::format(const var::StringView path) {
 Link &Link::reset() {
   API_RETURN_VALUE_IF_ERROR(*this);
 
-  API_SYSTEM_CALL("", link_reset(driver()));
+  if (is_connected() == false) {
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EBADF);
+  }
 
-  driver()->transport_version = 0;
-  driver()->phy_driver.handle = LINK_PHY_OPEN_ERROR;
+  // this will always result in an error (even on success)
+  link_reset(driver());
+  API_RESET_ERROR();
+
+  disregard_connection();
 
   return *this;
 }
@@ -427,15 +468,23 @@ Link &Link::reset() {
 Link &Link::reset_bootloader() {
   API_RETURN_VALUE_IF_ERROR(*this);
 
-  link_resetbootloader(driver());
+  if (is_connected() == false) {
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EBADF);
+  }
 
-  driver()->transport_version = 0;
-  driver()->phy_driver.handle = LINK_PHY_OPEN_ERROR;
+  link_resetbootloader(driver());
+  API_RESET_ERROR();
+  disregard_connection();
   return *this;
 }
 
 Link &Link::get_bootloader_attr(bootloader_attr_t &attr) {
   API_RETURN_VALUE_IF_ERROR(*this);
+
+  if (is_connected() == false) {
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EBADF);
+  }
+
   int err = -1;
   if (!is_bootloader()) {
     API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
@@ -447,6 +496,8 @@ Link &Link::get_bootloader_attr(bootloader_attr_t &attr) {
     err = link_bootloader_attr(driver(), &attr, 0);
   }
 
+  API_SYSTEM_CALL("", err);
+
   return *this;
 }
 
@@ -455,6 +506,10 @@ u32 Link::validate_os_image_id_with_connected_bootloader(
   API_RETURN_VALUE_IF_ERROR(0);
   int err = -1;
   u32 image_id;
+
+  if (is_connected() == false) {
+    API_RETURN_VALUE_ASSIGN_ERROR(0, "", EBADF);
+  }
 
   if (!is_bootloader()) {
     return 0;
@@ -483,37 +538,40 @@ u32 Link::validate_os_image_id_with_connected_bootloader(
 
 Link &Link::erase_os(const UpdateOs &options) {
   API_RETURN_VALUE_IF_ERROR(*this);
-  int err;
+
+  if (is_connected() == false) {
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EBADF);
+  }
 
   if (!is_bootloader()) {
     API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
   }
 
-  const api::ProgressCallback *progress_callback =
-      options.printer()->progress_callback();
+  const api::ProgressCallback *progress_callback
+    = options.printer()->progress_callback();
 
-  options.printer()->progress_key() = "erasing";
+  options.printer()->set_progress_key("erasing");
+
+  // first erase the flash
+  API_SYSTEM_CALL("", link_eraseflash(driver()));
+  API_RETURN_VALUE_IF_ERROR(*this);
 
   if (progress_callback) {
     progress_callback->update(
       0,
       api::ProgressCallback::indeterminate_progress_total());
   }
-  // first erase the flash
-  err = link_eraseflash(driver());
 
-  if (err < 0) {
-    if (progress_callback) {
-      progress_callback->update(0, 0);
-    }
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
-  }
-
+  int err;
   bootloader_attr_t attr;
   memset(&attr, 0, sizeof(attr));
   int retry = 0;
   do {
     chrono::wait(500_milliseconds);
+    if (is_error()) {
+      API_RESET_ERROR();
+      driver()->phy_driver.flush(driver()->phy_driver.handle);
+    }
     get_bootloader_attr(attr);
 
     if (progress_callback) {
@@ -521,10 +579,12 @@ Link &Link::erase_os(const UpdateOs &options) {
         retry,
         api::ProgressCallback::indeterminate_progress_total());
     }
-  } while ((err < 0) && (retry++ < options.bootloader_retry_count()));
+  } while ((is_error()) && (retry++ < options.bootloader_retry_count()));
+  bool is_error_state = is_error();
 
   chrono::wait(250_milliseconds);
 
+  API_RESET_ERROR();
   // flush just incase the protocol gets filled with get attr requests
   driver()->phy_driver.flush(driver()->phy_driver.handle);
 
@@ -532,7 +592,7 @@ Link &Link::erase_os(const UpdateOs &options) {
     progress_callback->update(0, 0);
   }
 
-  if (err < 0) {
+  if (is_error_state) {
     API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
   }
 
@@ -541,6 +601,14 @@ Link &Link::erase_os(const UpdateOs &options) {
 
 Link &Link::install_os(u32 image_id, const UpdateOs &options) {
   API_RETURN_VALUE_IF_ERROR(*this);
+
+  if (is_connected() == false) {
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EBADF);
+  }
+
+  if (!is_bootloader()) {
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
+  }
 
   // must be connected to the bootloader with an erased OS
   int err = -1;
@@ -553,10 +621,6 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
   var::Data buffer(buffer_size);
   var::Data compare_buffer(buffer_size);
 
-  if (!is_bootloader()) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
-  }
-
   if (options.image()->seek(0).is_error()) {
     API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
   }
@@ -564,7 +628,7 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
   u32 start_address = m_bootloader_attributes.startaddr;
   u32 loc = start_address;
 
-  options.printer()->progress_key() = "installing";
+  options.printer()->set_progress_key("installing");
 
   if (progress_callback) {
     progress_callback->update(0, 100);
@@ -721,24 +785,34 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
 }
 
 Link &Link::update_os(const UpdateOs &options) {
-  API_RETURN_VALUE_IF_ERROR(*this);
-
   API_ASSERT(options.image() != nullptr);
   API_ASSERT(options.printer() != nullptr);
 
+  API_RETURN_VALUE_IF_ERROR(*this);
+  if (is_connected() == false) {
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EBADF);
+  }
+
+  if (is_bootloader() == false) {
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
+  }
+
+  printf("%s():%d\n", __FUNCTION__, __LINE__);
   u32 image_id
     = validate_os_image_id_with_connected_bootloader(options.image());
 
   if (image_id == 0) {
-    return *this;
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
   }
 
-  var::String progress_key = var::String(options.printer()->progress_key());
+  const var::KeyString progress_key = options.printer()->progress_key();
 
+  printf("%s():%d\n", __FUNCTION__, __LINE__);
   erase_os(options);
+  printf("%s():%d\n", __FUNCTION__, __LINE__);
   install_os(image_id, options);
 
-  options.printer()->progress_key() = progress_key;
+  options.printer()->set_progress_key(progress_key);
   return *this;
 }
 

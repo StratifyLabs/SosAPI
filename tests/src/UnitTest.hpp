@@ -12,7 +12,6 @@
 
 #include "sos.hpp"
 
-
 class UnitTest : public test::Test {
 public:
   UnitTest(var::StringView name) : test::Test(name) {}
@@ -22,6 +21,38 @@ public:
     TEST_ASSERT(link_case());
     TEST_ASSERT(link_path_case());
     TEST_ASSERT(link_driver_path_case());
+    TEST_ASSERT(link_os_case());
+
+    return true;
+  }
+
+  bool link_os_case() {
+
+    Link link;
+
+    // link_set_debug(1000);
+    usb_link_transport_load_driver(link.driver());
+
+    auto list = link.get_info_list();
+    TEST_ASSERT(list.count() > 0);
+    TEST_ASSERT(link.connect(list.front().path()).is_success());
+
+    if (link.is_bootloader() == false) {
+      TEST_ASSERT(
+        link.reset_bootloader().reconnect(10, 200_milliseconds).is_bootloader()
+        == true);
+    }
+
+    const StringView binary_path = "../tests/Nucleo-F446ZE.bin";
+    TEST_ASSERT(FileSystem().exists(binary_path));
+
+    File image(binary_path);
+
+    TEST_ASSERT(link(Link::UpdateOs().set_image(&image).set_printer(&printer()))
+                  .is_success());
+
+    TEST_ASSERT(link.reset().reconnect().is_success());
+    printer().object("info", link.info());
 
     return true;
   }
@@ -33,9 +64,43 @@ public:
     usb_link_transport_load_driver(link.driver());
 
     link_set_debug(0);
-    auto list = link.get_info_list();
 
+    TEST_ASSERT(link.connect("/usb/2000/0001").is_error());
+    API_RESET_ERROR();
+    TEST_ASSERT(link.reset().is_error());
+    API_RESET_ERROR();
+    TEST_ASSERT(link.ping("/usb/2000/0001") == false);
+    TEST_ASSERT(is_success());
+
+    auto list = link.get_info_list();
     TEST_ASSERT(list.count() > 0);
+
+    TEST_ASSERT(link.ping(list.front().path()) == true);
+    TEST_ASSERT(is_success());
+
+    printer().array("list", list);
+    for (const auto &device : list) {
+      TEST_ASSERT(link.connect(device.path()).is_success());
+
+      TEST_ASSERT(link.disconnect().is_success());
+    }
+
+    TEST_ASSERT(link.connect(list.front().path()).is_success());
+    TEST_ASSERT(link.reset().is_success());
+
+    TEST_ASSERT(link.reconnect(10, 200_milliseconds).is_success());
+    printer().object("info", link.info());
+    TEST_ASSERT(
+      list.front().serial_number()
+      == link.info().sys_info().serial_number().to_string());
+
+    TEST_ASSERT(link.reset_bootloader().is_success());
+    TEST_ASSERT(link.reconnect(10, 200_milliseconds).is_bootloader());
+    TEST_ASSERT(link.is_connected());
+    TEST_ASSERT(
+      link.reset().reconnect(10, 200_milliseconds).is_bootloader() == false);
+    TEST_ASSERT(is_success());
+    TEST_ASSERT(link.is_connected());
 
     return true;
   }

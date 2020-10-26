@@ -289,17 +289,17 @@ public:
 
   fs::PathList get_path_list();
 
-  var::Vector<Info> get_info_list();
+  using InfoList = var::Vector<Info>;
+  InfoList get_info_list();
 
   Link &connect(var::StringView path, IsLegacy is_legacy = IsLegacy::no);
   bool is_legacy() const { return m_is_legacy == IsLegacy::yes; }
   Link &reconnect(int retries = 5, chrono::MicroTime delay = 500_milliseconds);
   Link &disconnect();
-  Link &set_disconnected();
+  Link &disregard_connection();
 
   bool ping(const var::StringView path);
   bool is_connected() const;
-  bool get_is_connected() const { return is_connected(); }
 
   static var::KeyString convert_permissions(link_mode_t mode);
 
@@ -378,9 +378,19 @@ private:
   Link &erase_os(const UpdateOs &options);
   Link &install_os(u32 image_id, const UpdateOs &options);
   Link &reset_progress();
+
+  enum class Connection { null, bootloader, os };
+
+  Connection ping_connection(const var::StringView path);
 };
 
 } // namespace sos
+
+namespace printer {
+class Printer;
+Printer &operator<<(Printer &printer, const sos::Link::Info &a);
+Printer &operator<<(Printer &printer, const sos::Link::InfoList &a);
+} // namespace printer
 
 #endif // link
 
