@@ -17,19 +17,147 @@ public:
   UnitTest(var::StringView name) : test::Test(name) {}
 
   bool execute_class_api_case() {
-
     TEST_ASSERT(link_case());
-    TEST_ASSERT(link_path_case());
-    TEST_ASSERT(link_driver_path_case());
-    TEST_ASSERT(link_os_case());
+    TEST_ASSERT(appfs_case());
 
     return true;
   }
 
-  bool link_os_case() {
+  bool appfs_case() {
 
     Link link;
+    usb_link_transport_load_driver(link.driver());
 
+    FileSystem device_fs(link.driver());
+    auto list = link.get_info_list();
+    TEST_ASSERT(list.count() > 0);
+
+    TEST_ASSERT(link.connect(list.front().path()).is_success());
+    if (link.is_bootloader()) {
+      TEST_ASSERT(link.reset().reconnect().is_success());
+    }
+
+    printer().object("system", link.info());
+
+    device_fs.remove("/app/flash/HelloWorld");
+    API_RESET_ERROR();
+    device_fs.remove("/app/ram/HelloWorld");
+    API_RESET_ERROR();
+
+    {
+      const StringView hello_world_binary_path
+        = "../tests/HelloWorld_build_release_v7em_f4sh";
+
+      const u32 ram_size = 16384;
+      {
+        Appfs::FileAttributes(File(hello_world_binary_path))
+          .set_ram_size(ram_size)
+          .set_flash(false)
+          .apply(File(hello_world_binary_path, OpenMode::read_write()));
+
+        Appfs::Info local_info = Appfs().get_info(hello_world_binary_path);
+
+        printer().object("localRamInfo", local_info);
+
+        TEST_ASSERT(
+          Appfs(
+            Appfs::Construct().set_executable(true).set_name("HelloWorld"),
+            link.driver())
+            .append(File(hello_world_binary_path))
+            .is_success());
+        PRINTER_TRACE(printer(), "");
+
+        TEST_ASSERT(device_fs.exists("/app/ram/HelloWorld"));
+        Appfs::Info info = Appfs(link.driver()).get_info("/app/ram/HelloWorld");
+        printer().key("ramSize", NumberString(info.ram_size()));
+        TEST_ASSERT(info.ram_size() == ram_size);
+
+        TEST_ASSERT(device_fs.remove("/app/ram/HelloWorld").is_success());
+      }
+
+      {
+        Appfs::FileAttributes(File(hello_world_binary_path))
+          .set_flash()
+          .apply(File(hello_world_binary_path, OpenMode::read_write()));
+
+        Appfs::Info local_info = Appfs().get_info(hello_world_binary_path);
+        printer().object("localFlashInfo", local_info);
+
+        TEST_ASSERT(
+          Appfs(
+            Appfs::Construct().set_executable(true).set_name("HelloWorld"),
+            link.driver())
+            .append(File(hello_world_binary_path))
+            .is_success());
+        PRINTER_TRACE(printer(), "");
+        const StringView device_path = "/app/flash/HelloWorld";
+        TEST_ASSERT(device_fs.exists(device_path));
+        Appfs::Info info = Appfs(link.driver()).get_info(device_path);
+        printer().object("deviceFlashInfo", info);
+
+        TEST_ASSERT(info.ram_size() == ram_size);
+        TEST_ASSERT(device_fs.get_info(device_path).is_file());
+        printer().object("flashFileInfo", device_fs.get_info(device_path));
+        TEST_ASSERT(device_fs.remove(device_path).is_success());
+      }
+
+      {
+
+        TEST_ASSERT(Appfs(
+                      Appfs::Construct()
+                        .set_executable(false)
+                        .set_name("HelloWorld")
+                        .set_size(File(hello_world_binary_path).size()),
+                      link.driver())
+                      .append(File(hello_world_binary_path))
+                      .is_success());
+
+        const StringView device_path = "/app/flash/HelloWorld";
+
+        TEST_ASSERT(
+          DataFile().write(File(hello_world_binary_path)).data()
+          == DataFile()
+               .write(File(device_path, OpenMode::read_only(), link.driver()))
+               .data());
+
+        TEST_ASSERT(device_fs.get_info(device_path).is_file());
+      }
+
+      TEST_ASSERT(Appfs(link.driver()).is_flash_available());
+      TEST_ASSERT(Appfs(link.driver()).is_ram_available());
+
+      return true;
+    }
+
+    {
+      Appfs appfs(link.driver());
+
+      Appfs::Info info = appfs.get_info("/app/flash/HelloWorld");
+      TEST_ASSERT(is_success());
+
+      printer().object("info", info);
+      TEST_ASSERT(info.name() == "HelloWorld");
+      TEST_ASSERT(Version::from_u16(info.version()).string_view() == "1.30");
+      TEST_ASSERT(info.signature() == 0x384);
+      TEST_ASSERT(info.is_orphan() == false);
+      TEST_ASSERT(info.is_flash() == true);
+      TEST_ASSERT(info.is_startup() == false);
+      TEST_ASSERT(info.is_unique() == false);
+    }
+
+    return true;
+  }
+
+  bool link_case() {
+    TEST_ASSERT(link_connect_case());
+    TEST_ASSERT(link_path_case());
+    TEST_ASSERT(link_driver_path_case());
+    TEST_ASSERT(link_os_case());
+    return true;
+  }
+
+  bool link_os_case() {
+    Link link;
     // link_set_debug(1000);
     usb_link_transport_load_driver(link.driver());
 
@@ -47,24 +175,18 @@ public:
     TEST_ASSERT(FileSystem().exists(binary_path));
 
     File image(binary_path);
-
     TEST_ASSERT(link(Link::UpdateOs().set_image(&image).set_printer(&printer()))
                   .is_success());
-
     TEST_ASSERT(link.reset().reconnect().is_success());
     printer().object("info", link.info());
-
     return true;
   }
 
-  bool link_case() {
+  bool link_connect_case() {
 
     Link link;
-
     usb_link_transport_load_driver(link.driver());
-
     link_set_debug(0);
-
     TEST_ASSERT(link.connect("/usb/2000/0001").is_error());
     API_RESET_ERROR();
     TEST_ASSERT(link.reset().is_error());
@@ -101,7 +223,6 @@ public:
       link.reset().reconnect(10, 200_milliseconds).is_bootloader() == false);
     TEST_ASSERT(is_success());
     TEST_ASSERT(link.is_connected());
-
     return true;
   }
 

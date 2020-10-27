@@ -1,4 +1,4 @@
-/*! \file */ // Copyright 2011-2020 Tyler Gilbert and Stratify Labs, Inc; see
+﻿/*! \file */ // Copyright 2011-2020 Tyler Gilbert and Stratify Labs, Inc; see
              // LICENSE.md for rights.
 // Copyright 2011-2020 Tyler Gilbert and Stratify Labs, Inc
 
@@ -19,28 +19,33 @@ printer::operator<<(printer::Printer &printer, const appfs_file_t &a) {
   printer.key("name", var::StringView(a.hdr.name));
   printer.key("id", var::StringView(a.hdr.id));
   printer.key("mode", var::NumberString(a.hdr.mode, "0%o").string_view());
-  printer.key("version",
-              var::NumberString()
-                  .format("%d.%d", a.hdr.version >> 8, a.hdr.version & 0xff)
-                  .string_view());
+  printer.key(
+    "version",
+    var::NumberString()
+      .format("%d.%d", a.hdr.version >> 8, a.hdr.version & 0xff)
+      .string_view());
   printer.key("startup", var::NumberString(a.exec.startup, "%p").string_view());
-  printer.key("codeStart",
-              var::NumberString(a.exec.code_start, "%p").string_view());
+  printer.key(
+    "codeStart",
+    var::NumberString(a.exec.code_start, "%p").string_view());
   printer.key("codeSize", var::NumberString(a.exec.code_size).string_view());
-  printer.key("ramStart",
-              var::NumberString(a.exec.ram_start, "%p").string_view());
+  printer.key(
+    "ramStart",
+    var::NumberString(a.exec.ram_start, "%p").string_view());
   printer.key("ramSize", var::NumberString(a.exec.ram_size).string_view());
   printer.key("dataSize", var::NumberString(a.exec.data_size).string_view());
-  printer.key("oFlags",
-              var::NumberString(a.exec.o_flags, "0x%lX").string_view());
-  printer.key("signature",
-              var::NumberString(a.exec.signature, "0x%08lx").string_view());
+  printer.key(
+    "oFlags",
+    var::NumberString(a.exec.o_flags, "0x%lX").string_view());
+  printer.key(
+    "signature",
+    var::NumberString(a.exec.signature, "0x%08lx").string_view());
   return printer;
 }
 
-printer::Printer &
-printer::operator<<(printer::Printer &printer,
-                    const sos::Appfs::Appfs::FileAttributes &a) {
+printer::Printer &printer::operator<<(
+  printer::Printer &printer,
+  const sos::Appfs::Appfs::FileAttributes &a) {
   printer.key("name", a.name());
   printer.key("id", a.id());
   printer.key(
@@ -58,8 +63,8 @@ printer::operator<<(printer::Printer &printer,
   return printer;
 }
 
-printer::Printer &printer::operator<<(printer::Printer &printer,
-                                      const sos::Appfs::Info &a) {
+printer::Printer &
+printer::operator<<(printer::Printer &printer, const sos::Appfs::Info &a) {
   printer.key("name", a.name());
   printer.key("mode", var::NumberString(a.mode(), "0%o").string_view());
   if (a.is_executable()) {
@@ -68,8 +73,9 @@ printer::Printer &printer::operator<<(printer::Printer &printer,
       "version",
       var::String().format("%d.%d", a.version() >> 8, a.version() & 0xff));
 
-    printer.key("signature",
-                var::NumberString(a.signature(), F3208X).string_view());
+    printer.key(
+      "signature",
+      var::NumberString(a.signature(), F3208X).string_view());
     printer.key("ram", var::NumberString(a.ram_size()).string_view());
     printer.key_bool("orphan", a.is_orphan());
     printer.key_bool("flash", a.is_flash());
@@ -81,56 +87,16 @@ printer::Printer &printer::operator<<(printer::Printer &printer,
 
 using namespace sos;
 
-Appfs::FileAttributes::FileAttributes(const appfs_file_t &appfs_file) {
-  m_name = appfs_file.hdr.name;
-  m_id = appfs_file.hdr.id;
-  m_ram_size = appfs_file.exec.ram_size;
-  m_o_flags = appfs_file.exec.o_flags;
-  m_version = appfs_file.hdr.version;
+Appfs::FileAttributes::FileAttributes(const fs::FileObject &existing) {
+  existing.read(View(m_file_header));
 }
 
 const Appfs::FileAttributes &
 Appfs::FileAttributes::apply(const fs::FileObject &file) const {
-  appfs_file_t appfs_file;
-
   int location = file.location();
-  file.seek(0).read(var::View(appfs_file));
-
-  if (m_name.is_empty() == false) {
-    var::View(appfs_file.hdr.name)
-        .fill<u8>(0)
-        .truncate(LINK_NAME_MAX - 1)
-        .copy(m_name);
-  }
-
-  if (m_id.is_empty() == false) {
-    var::View(appfs_file.hdr.id)
-        .fill<u8>(0)
-        .truncate(LINK_NAME_MAX - 1)
-        .copy(m_id);
-  }
-
-  if (m_version != 0) {
-    appfs_file.hdr.version = m_version;
-  }
-
-  if (m_access_mode != 0) {
-    appfs_file.hdr.mode = m_access_mode;
-  }
-
-  if (m_ram_size >= 4096) {
-    appfs_file.exec.ram_size = m_ram_size;
-  }
-
-  if (appfs_file.exec.ram_size < 4096) {
-    appfs_file.exec.ram_size = 4096;
-  }
-
-  appfs_file.exec.o_flags = m_o_flags;
-
   file.seek(0)
-      .write(var::View(appfs_file))
-      .seek(location, fs::File::Whence::set);
+    .write(var::View(m_file_header))
+    .seek(location, fs::File::Whence::set);
 
   return *this;
 }
@@ -142,29 +108,37 @@ Appfs::Appfs(FSAPI_LINK_DECLARE_DRIVER) {
 }
 
 Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
-    : m_file("/app/.install",
-             fs::OpenMode::write_only() FSAPI_LINK_INHERIT_DRIVER_LAST) {
+  : m_file(
+    "/app/.install",
+    fs::OpenMode::write_only() FSAPI_LINK_INHERIT_DRIVER_LAST) {
 
-  const var::PathString path =
-      var::PathString(options.mount()) / "flash" / options.name();
-  fs::FileSystem(FSAPI_LINK_MEMBER_DRIVER).remove(path.string_view());
+  FSAPI_LINK_SET_DRIVER((*this), link_driver);
+
+  const var::PathString path
+    = var::PathString(options.mount()) / "flash" / options.name();
+
+  if (fs::FileSystem(FSAPI_LINK_MEMBER_DRIVER).exists(path)) {
+    fs::FileSystem(FSAPI_LINK_MEMBER_DRIVER).remove(path.string_view());
+  }
 
   if (options.is_executable() == false) {
+
+    API_ASSERT(options.size() != 0);
     m_request = I_APPFS_CREATE;
 
-    appfs_file_t *f =
-        reinterpret_cast<appfs_file_t *>(m_create_attributes.buffer);
+    appfs_file_t *f
+      = reinterpret_cast<appfs_file_t *>(m_create_install_attributes.buffer);
 
     // delete the settings if they exist
 
     var::View(f->hdr.name)
-        .fill<u8>(0)
-        .truncate(sizeof((f->hdr.name)))
-        .copy(options.name());
+      .fill<u8>(0)
+      .truncate(sizeof((f->hdr.name)))
+      .copy(options.name());
 
     f->hdr.mode = 0666;
-    f->exec.code_size =
-        options.size() + overhead(); // total number of bytes in file
+    f->exec.code_size
+      = options.size() + overhead(); // total number of bytes in file
     f->exec.signature = APPFS_CREATE_SIGNATURE;
 
     // f holds bytes in the buffer
@@ -179,8 +153,15 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
 Appfs &Appfs::append(
   const fs::FileObject &file,
   const api::ProgressCallback *progress_callback) {
+
+  if (m_data_size == 0 && m_request == I_APPFS_INSTALL) {
+    m_data_size = file.size();
+  }
+
   var::Array<char, APPFS_PAGE_SIZE> buffer;
+
   var::View(buffer).fill(0);
+
   size_t bytes_written = 0;
   const size_t file_size = file.size();
   while (file.read(buffer).return_value() > 0) {
@@ -194,11 +175,10 @@ Appfs &Appfs::append(
   return *this;
 }
 
-Appfs &Appfs::append(var::View blob) {
+void Appfs::append(var::View blob) {
   u32 bytes_written = 0;
-  if (m_bytes_written == m_data_size) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", ENOSPC);
-    return *this;
+  if (m_data_size && (m_bytes_written == m_data_size)) {
+    API_RETURN_ASSIGN_ERROR("", ENOSPC);
   }
 
   while (m_bytes_written < m_data_size && bytes_written < blob.size()) {
@@ -209,33 +189,34 @@ Appfs &Appfs::append(var::View blob) {
       page_size = page_size_available;
     }
 
-    memcpy(m_create_attributes.buffer + page_offset,
-           blob.to_const_u8() + bytes_written, page_size);
+    memcpy(
+      m_create_install_attributes.buffer + page_offset,
+      blob.to_const_u8() + bytes_written,
+      page_size);
 
     m_bytes_written += page_size;
     bytes_written += page_size;
-
-    if (((m_bytes_written % APPFS_PAGE_SIZE) == 0) // at page boundary
-        || (m_bytes_written == m_data_size)) {     // or to the end
+    if (
+      ((m_bytes_written % APPFS_PAGE_SIZE) == 0) // at page boundary
+      || (m_bytes_written == m_data_size)) {     // or to the end
 
       page_size = m_bytes_written % APPFS_PAGE_SIZE;
       if (page_size == 0) {
-        m_create_attributes.nbyte = APPFS_PAGE_SIZE;
+        m_create_install_attributes.nbyte = APPFS_PAGE_SIZE;
       } else {
-        m_create_attributes.nbyte = page_size;
+        m_create_install_attributes.nbyte = page_size;
       }
-      m_file.ioctl(m_request, &m_create_attributes);
 
-      m_create_attributes.loc += m_create_attributes.nbyte;
+      m_file.ioctl(m_request, &m_create_install_attributes);
+      m_create_install_attributes.loc += m_create_install_attributes.nbyte;
     }
   }
-
-  return *this;
 }
 
 bool Appfs::is_flash_available() {
   API_RETURN_VALUE_IF_ERROR(false);
-  bool result = fs::Dir("app/flash" FSAPI_LINK_MEMBER_DRIVER_LAST).is_success();
+  bool result
+    = fs::Dir("/app/flash" FSAPI_LINK_MEMBER_DRIVER_LAST).is_success();
   API_RESET_ERROR();
   return result;
 }
@@ -304,56 +285,55 @@ return 0;
 Appfs::Info Appfs::get_info(var::StringView path) {
 
   appfs_file_t appfs_file_header;
-  appfs_info_t info;
-  int result;
-
-  fs::File(path, fs::OpenMode::read_only() FSAPI_LINK_MEMBER_DRIVER_LAST)
-    .read(var::View(appfs_file_header));
+  int result
+    = fs::File(path, fs::OpenMode::read_only() FSAPI_LINK_MEMBER_DRIVER_LAST)
+        .read(var::View(appfs_file_header))
+        .return_value();
 
   if (is_error()) {
     return Info();
   }
 
-  if (result == sizeof(appfs_file_header)) {
-    // first check to see if the name matches -- otherwise it isn't an app
-    // file
-    const var::StringView path_name = fs::Path::name(path);
+  if (result < sizeof(appfs_file_header)) {
+    API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", ENOEXEC);
+  }
 
-    if (path_name.find(".sys") == 0) {
-      API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", EINVAL);
-    }
+  // first check to see if the name matches -- otherwise it isn't an app
+  // file
+  const var::StringView path_name = fs::Path::name(path);
 
-    if (path_name.find(".free") == 0) {
-      API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", EINVAL);
-    }
+  if (path_name.find(".sys") == 0) {
+    API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", EINVAL);
+  }
 
-    if ((appfs_file_header.hdr.mode & 0111) == 0) {
-      // return AppfsInfo();
-    }
+  if (path_name.find(".free") == 0) {
+    API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", EINVAL);
+  }
 
-    const var::StringView app_name = appfs_file_header.hdr.name;
+  if ((appfs_file_header.hdr.mode & 0111) == 0) {
+    // return AppfsInfo();
+  }
 
-    memset(&info, 0, sizeof(info));
-    if (
-      path_name == app_name
+  const var::StringView app_name = appfs_file_header.hdr.name;
+
+  appfs_info_t info = {0};
+  if (
+    path_name == app_name
 #if defined __link
-      || (path_name.find(app_name) == 0)
+    || (path_name.find(app_name) == 0)
 #endif
-
-    ) {
-      memcpy(info.name, appfs_file_header.hdr.name, LINK_NAME_MAX);
-      info.mode = appfs_file_header.hdr.mode;
-      info.version = appfs_file_header.hdr.version;
-      memcpy(info.id, appfs_file_header.hdr.id, LINK_NAME_MAX);
-      info.ram_size = appfs_file_header.exec.ram_size;
-      info.o_flags = appfs_file_header.exec.o_flags;
-      info.signature = appfs_file_header.exec.signature;
-    } else {
-      API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", ENOEXEC);
-    }
+  ) {
+    View(info.name).copy(View(appfs_file_header.hdr.name));
+    info.mode = appfs_file_header.hdr.mode;
+    info.version = appfs_file_header.hdr.version;
+    View(info.id).copy(View(appfs_file_header.hdr.id));
+    info.ram_size = appfs_file_header.exec.ram_size;
+    info.o_flags = appfs_file_header.exec.o_flags;
+    info.signature = appfs_file_header.exec.signature;
   } else {
     API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", ENOEXEC);
   }
+
   return Info(info);
 }
 
