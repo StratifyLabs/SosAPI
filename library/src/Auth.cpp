@@ -33,9 +33,10 @@ void Auth::Token::populate(var::View data) {
   memcpy(&m_auth_token, data.to_const_void(), size);
 }
 
-Auth::Auth(FSAPI_LINK_DECLARE_DRIVER)
-    : m_file("/dev/auth",
-             fs::OpenMode::read_write() FSAPI_LINK_INHERIT_DRIVER_LAST) {}
+Auth::Auth(const var::StringView device_path FSAPI_LINK_DECLARE_DRIVER_LAST)
+  : m_file(
+    device_path.is_empty() ? "/dev/sys" : device_path,
+    fs::OpenMode::read_write() FSAPI_LINK_INHERIT_DRIVER_LAST) {}
 
 bool Auth::authenticate(var::View key) {
   crypto::Random random;
@@ -55,19 +56,20 @@ bool Auth::authenticate(var::View key) {
   reverse_key_token.token = key_token.key;
 
   // do SHA256 calcs
-  Token validation_token =
-      finish(Token(crypto::Sha256().update(var::View(key_token)).output()));
+  Token validation_token
+    = finish(Token(crypto::Sha256().update(var::View(key_token)).output()));
 
   // hash.start();
   // hash << var::View(reverse_key_token);
   // hash.finish();
 
-  const crypto::Sha256::Hash reverse_key_token_hash =
-      crypto::Sha256().update(var::View(reverse_key_token)).output();
+  const crypto::Sha256::Hash reverse_key_token_hash
+    = crypto::Sha256().update(var::View(reverse_key_token)).output();
 
   // hash output should match validation token
-  if (var::View(reverse_key_token_hash) ==
-      var::View(validation_token.auth_token().data)) {
+  if (
+    var::View(reverse_key_token_hash)
+    == var::View(validation_token.auth_token().data)) {
     return true;
   }
 

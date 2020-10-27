@@ -67,7 +67,17 @@ public:
     auth_token_t m_auth_token;
   };
 
-  Auth(FSAPI_LINK_DECLARE_DRIVER_NULLPTR);
+  Auth() {}
+  Auth(const var::StringView device FSAPI_LINK_DECLARE_DRIVER_NULLPTR_LAST);
+
+  Auth(const Auth &a) = delete;
+  Auth &operator=(const Auth &a) = delete;
+
+  Auth(Auth &&a) { std::swap(m_file, a.m_file); }
+  Auth &operator=(Auth &&a) {
+    std::swap(m_file, a.m_file);
+    return *this;
+  }
 
   bool authenticate(var::View key);
 

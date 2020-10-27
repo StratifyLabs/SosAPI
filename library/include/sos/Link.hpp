@@ -37,17 +37,6 @@ public:
       set_info(sys_info);
     }
 
-    void clear() {
-      m_serial_number.clear();
-      m_path.clear();
-      m_sys_info.clear();
-    }
-
-    Info &set_port(const var::StringView port) {
-      m_path = port;
-      return *this;
-    }
-
     Info &set_info(const sos::Sys::Info &sys_info) {
       m_sys_info = sys_info;
       m_serial_number = sys_info.serial_number().to_string();

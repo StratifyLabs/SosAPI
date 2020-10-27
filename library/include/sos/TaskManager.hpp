@@ -53,9 +53,7 @@ public:
       m_value.tid = tid;
     }
 
-    Info(const sys_taskattr_t &attr) {
-      memcpy(&m_value, &attr, sizeof(m_value));
-    }
+    Info(const sys_taskattr_t &attr) { m_value = attr; }
 
     static Info invalid() { return Info(); }
 
@@ -140,8 +138,8 @@ public:
     }
 
     bool operator==(const Info &a) const {
-      return a.pid() == pid() && a.thread_id() == thread_id() &&
-             a.name() == name();
+      return (a.pid() == pid()) && (a.thread_id() == thread_id())
+             && (a.name() == name());
     }
 
   private:
@@ -150,8 +148,9 @@ public:
 
   using IsNull = fs::File::IsNull;
 
-  TaskManager(IsNull is_null);
-  TaskManager(FSAPI_LINK_DECLARE_DRIVER_NULLPTR);
+  TaskManager() {}
+  TaskManager(
+    const var::StringView device FSAPI_LINK_DECLARE_DRIVER_NULLPTR_LAST);
 
   TaskManager(const TaskManager &a) = delete;
   TaskManager &operator=(const TaskManager &a) = delete;

@@ -17,11 +17,33 @@ public:
   UnitTest(var::StringView name) : test::Test(name) {}
 
   bool execute_class_api_case() {
+    TEST_ASSERT(sys_case());
     TEST_ASSERT(task_manager_case());
-
     return true;
     TEST_ASSERT(link_case());
     TEST_ASSERT(appfs_case());
+
+    return true;
+  }
+
+  bool sys_case() {
+    Link link;
+    usb_link_transport_load_driver(link.driver());
+
+    auto list = link.get_info_list();
+    TEST_ASSERT(list.count());
+
+    link.connect(list.front().path());
+    TEST_ASSERT(is_success());
+
+    Sys sys("", link.driver());
+    TEST_ASSERT(is_success());
+    sys = Sys("/dev/sys", link.driver());
+    TEST_ASSERT(is_success());
+
+    Sys::Info info = sys.get_info();
+
+    printer().object("systemInformation", info);
 
     return true;
   }
@@ -33,12 +55,13 @@ public:
     {
       auto list = link.get_info_list();
       TEST_ASSERT(list.count() > 0);
-
       TEST_ASSERT(link.connect(list.front().path()).is_success());
     }
 
     {
-      TaskManager task_manager(link.driver());
+      TaskManager task_manager("", link.driver());
+      TEST_ASSERT(is_success());
+      task_manager = TaskManager("/dev/sys", link.driver());
       TEST_ASSERT(is_success());
 
       auto list = task_manager.get_info();
@@ -47,6 +70,25 @@ public:
       for (const TaskManager::Info &info : list) {
         printer().object(info.name(), info);
       }
+
+      TEST_ASSERT(list.front().name() == "idle");
+      TEST_ASSERT(list.front().id() == 0);
+      TEST_ASSERT(list.front().pid() == 0);
+      TEST_ASSERT(list.front().priority() == 0);
+      TEST_ASSERT(list.front().priority_ceiling() == 0);
+      TEST_ASSERT(list.front().is_thread() == false);
+      TEST_ASSERT(list.front().stack() != 0);
+      TEST_ASSERT(list.front().stack_size() != 0);
+      TEST_ASSERT(list.front().memory_size() != 0);
+      TEST_ASSERT(list.front().is_thread() == false);
+      TEST_ASSERT(list.front().memory_utilization() > 0);
+      TEST_ASSERT(list.front().memory_utilization() < 100);
+      TEST_ASSERT(list.at(1).name() == "sys");
+      TEST_ASSERT(list.at(1).id() == 1);
+      TEST_ASSERT(list.at(1).pid() == 0);
+      TEST_ASSERT(list.at(1).is_thread() == true);
+      TEST_ASSERT(list.at(1).heap() == 0);
+      TEST_ASSERT(!(list.front() == list.at(1)));
     }
 
     return true;

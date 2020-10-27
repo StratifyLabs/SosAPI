@@ -71,158 +71,76 @@ private:
   mcu_sn_t m_serial_number;
 };
 
-/*! \brief Sys Class
- * \details This class allows access to system attributes and functions.
- */
 class Sys : public api::ExecutionContext {
 public:
-
-  /*! \brief System Information Class
-   * \details This class holds the system information.
-   *
-   *
-   * \code
-   * #include <sapi/sys.hpp>
-   * SysInfo info = SysInfo::get(); //grab system information
-   * Printer p;
-   * p << info; //print system information using the printer
-   * \endcode
-   *
-   */
   class Info {
     friend class Sys;
 
   public:
-    /*! \details Constructs an empty SysInfo object. */
-    Info() { clear(); }
+    Info() { m_info = {0}; }
 
-    /*! \details Constructs an object from *info*. */
     explicit Info(const sys_info_t &info) : m_info(info) {}
 
     operator const sys_info_t &() const { return m_info; }
 
-    /*! \details Returns true if the object is valid. */
     bool is_valid() const { return cpu_frequency() != 0; }
-
-    /*! \details Returns the OS package project ID. */
-    var::StringView  id() const { return m_info.id; }
-    /*! \details Returns the team ID of the system. */
-    var::StringView  team_id() const { return m_info.team_id; }
-    /*! \details Returns the name of the system. */
-    var::StringView  name() const { return m_info.name; }
-    /*! \details Returns the system version. */
-    var::StringView  system_version() const { return m_info.sys_version; }
-    /*! \details Returns the board support package version (same as
-     * system_version()). */
-    var::StringView  bsp_version() const { return m_info.sys_version; }
-    /*! \details Returns the Stratify OS version version. */
-    var::StringView  sos_version() const { return m_info.kernel_version; }
-    /*! \details Returns the kernel version (same as sos_version()). */
-    var::StringView  kernel_version() const { return m_info.kernel_version; }
-
-    /*! \details Returns the CPU architecture.
-     *
-     * Applications that are installed on the system must
-     * have a compatible architecture.
-     *
-     *
-     */
-    var::StringView  cpu_architecture() const { return m_info.arch; }
-
-    /*! \details Returns the CPU core clock frequency in Hertz. */
+    var::StringView id() const { return m_info.id; }
+    var::StringView team_id() const { return m_info.team_id; }
+    var::StringView name() const { return m_info.name; }
+    var::StringView system_version() const { return m_info.sys_version; }
+    var::StringView bsp_version() const { return m_info.sys_version; }
+    var::StringView sos_version() const { return m_info.kernel_version; }
+    var::StringView kernel_version() const { return m_info.kernel_version; }
+    var::StringView cpu_architecture() const { return m_info.arch; }
     u32 cpu_frequency() const { return m_info.cpu_freq; }
-
-    /*! \details Returns the signature for the system call table.
-     *
-     * Applications that are installed must have a compatible signature.
-     *
-     */
     u32 application_signature() const { return m_info.signature; }
-
-    /*! \details Returns the GIT Hash of the OS package as built. */
-    var::StringView  bsp_git_hash() const { return m_info.bsp_git_hash; }
-    /*! \details Returns the Stratify OS library used to link the OS package. */
-    var::StringView  sos_git_hash() const { return m_info.sos_git_hash; }
-    /*! \details Returns the Stratify OS MCU library used to link the OS
-     * package.
-     */
-    var::StringView  mcu_git_hash() const { return m_info.mcu_git_hash; }
+    var::StringView bsp_git_hash() const { return m_info.bsp_git_hash; }
+    var::StringView sos_git_hash() const { return m_info.sos_git_hash; }
+    var::StringView mcu_git_hash() const { return m_info.mcu_git_hash; }
 
     u32 o_flags() const { return m_info.o_flags; }
 
-    var::StringView  arch() const { return m_info.arch; }
-    var::StringView  stdin_name() const { return m_info.stdin_name; }
-    var::StringView  stdout_name() const { return m_info.stdout_name; }
-    var::StringView  trace_name() const { return m_info.trace_name; }
+    var::StringView architecture() const { return m_info.arch; }
+    var::StringView stdin_name() const { return m_info.stdin_name; }
+    var::StringView stdout_name() const { return m_info.stdout_name; }
+    var::StringView trace_name() const { return m_info.trace_name; }
     u32 hardware_id() const { return m_info.hardware_id; }
 
     SerialNumber serial_number() const { return SerialNumber(m_info.serial); }
-
-    void clear() { memset(&m_info, 0, sizeof(m_info)); }
 
   private:
     sys_info_t m_info;
   };
 
-  Sys(FSAPI_LINK_DECLARE_DRIVER_NULLPTR);
+  Sys() {}
+  Sys(const var::StringView device FSAPI_LINK_DECLARE_DRIVER_NULLPTR_LAST);
+
+  Sys(const Sys &a) = delete;
+  Sys &operator=(const Sys &a) = delete;
+
+  Sys(Sys &&a) { std::swap(m_file, a.m_file); }
+  Sys &operator=(Sys &&a) {
+    std::swap(m_file, a.m_file);
+    return *this;
+  }
 
 #if !defined __link
-
-  /*! \details Gets the version (system/board version).
-   *
-   * @param version The destination string for the version
-   * @return Zero on success
-   */
   var::String get_version();
-
-  /*! \details Gets the version (kernel version).
-   *
-   * @param version The destination string for the version
-   * @return Zero on success
-   */
   var::String get_kernel_version();
-
-  /*! \details Loads the board configuration provided as
-   * part of the board support package.
-   *
-   * @param config A reference to the destination object
-   * @return Zero on success
-   *
-   * The object must be opened before calling this method.
-   *
-   * \sa open()
-   */
   int get_board_config(sos_board_config_t &config);
-
 #endif
 
-  /*! \details Loads the current system info.
-   *
-   *
-   */
   Info get_info() const;
-
   bool is_authenticated() const;
-
   sys_secret_key_t get_secret_key() const;
-
   SerialNumber get_serial_number() const;
-
-  /*! \details Loads the cloud kernel ID.
-   *
-   * @param id A reference to the destination data
-   * @return Less than zero if the operation failed
-   *
-   * The object must be opened before calling this method.
-   *
-   */
   sys_id_t get_id() const;
 
 private:
   fs::File m_file;
 };
 
-} // namespace sys
+} // namespace sos
 
 namespace printer {
 class Printer;

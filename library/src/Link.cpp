@@ -25,7 +25,6 @@ namespace printer {
 class Printer;
 Printer &operator<<(Printer &printer, const sos::Link::Info &a) {
   printer.key("path", a.path());
-  printer.key("port", a.port());
   printer.object("systemInformation", a.sys_info());
   return printer;
 }
@@ -162,8 +161,6 @@ Link &Link::connect(var::StringView path, IsLegacy is_legacy) {
       sizeof(mcu_sn_t));
   }
 
-  m_link_info.set_port(path).set_info(Sys::Info(sys_info));
-
   return *this;
 }
 
@@ -228,7 +225,6 @@ Link &Link::write_flash(int addr, const void *buf, int nbyte) {
 }
 
 Link &Link::disconnect() {
-  API_RETURN_VALUE_IF_ERROR(*this);
 
   if (driver()->phy_driver.handle != LINK_PHY_OPEN_ERROR) {
     link_disconnect(driver());
@@ -646,8 +642,8 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
     if (loc == start_address) {
       // we want to write the first 256 bytes last because the bootloader checks
       // this for a valid image
-      var::View buffer_view =
-          var::View(buffer).truncate(start_address_buffer.size());
+      var::View buffer_view
+        = var::View(buffer).truncate(start_address_buffer.size());
       start_address_buffer.copy(buffer_view);
 
       // memcpy(stackaddr, buffer, 256);
@@ -701,8 +697,8 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
 
           if (loc == start_address) {
             var::View(buffer)
-                .truncate(start_address_buffer.size())
-                .fill<u8>(0xff);
+              .truncate(start_address_buffer.size())
+              .fill<u8>(0xff);
           }
 
           compare_buffer.resize(bytes_read);
