@@ -68,12 +68,15 @@ var::Vector<TaskManager::Info> TaskManager::get_info() {
   result.reserve(task_count);
   int id = 0;
   while (is_success()) {
-    result.push_back(get_info(id++));
+    Info info = get_info(id++);
+    if (info.id() == 0) {
+      info.set_name("idle");
+    }
+    if (info.is_enabled()) {
+      result.push_back(info);
+    }
   }
   API_RESET_ERROR();
-  if (result.count()) {
-    result.pop_back();
-  }
   return result;
 }
 

@@ -17,8 +17,37 @@ public:
   UnitTest(var::StringView name) : test::Test(name) {}
 
   bool execute_class_api_case() {
+    TEST_ASSERT(task_manager_case());
+
+    return true;
     TEST_ASSERT(link_case());
     TEST_ASSERT(appfs_case());
+
+    return true;
+  }
+
+  bool task_manager_case() {
+    Link link;
+    usb_link_transport_load_driver(link.driver());
+
+    {
+      auto list = link.get_info_list();
+      TEST_ASSERT(list.count() > 0);
+
+      TEST_ASSERT(link.connect(list.front().path()).is_success());
+    }
+
+    {
+      TaskManager task_manager(link.driver());
+      TEST_ASSERT(is_success());
+
+      auto list = task_manager.get_info();
+      printer().key("listCount", NumberString(list.count()));
+      TEST_ASSERT(list.count() > 1);
+      for (const TaskManager::Info &info : list) {
+        printer().object(info.name(), info);
+      }
+    }
 
     return true;
   }
