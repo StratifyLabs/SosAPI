@@ -1,12 +1,15 @@
 ﻿
+
+#include <sys/Cli.hpp>
+
 #include "UnitTest.hpp"
 
 #define VERSION "0.1"
-#include "sys/Cli.hpp"
 
 void segfault(int a) { API_ASSERT(false); }
 
 int main(int argc, char *argv[]) {
+
   sys::Cli cli(argc, argv);
 
 #if defined __link
@@ -23,11 +26,12 @@ int main(int argc, char *argv[]) {
                            .set_git_hash(SOS_GIT_HASH)
                            .set_printer(&printer));
 
+#if defined __link
   { UnitTest(cli.get_name()).execute(cli); }
+#endif
 
   test::Test::finalize();
 
   exit(test::Test::final_result() == false);
-
   return 0;
 }

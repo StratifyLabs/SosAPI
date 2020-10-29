@@ -8,6 +8,8 @@
 #include <test/Test.hpp>
 #include <var.hpp>
 
+#if defined __link
+
 #include <usb/usb_link_transport_driver.h>
 
 #include "sos.hpp"
@@ -368,3 +370,5 @@ public:
 
 private:
 };
+
+#endif

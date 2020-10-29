@@ -163,8 +163,10 @@ sys_id_t Sys::get_id() const {
 
 #if !defined __link
 
-int Sys::get_board_config(sos_board_config_t &config) {
-  return ioctl(I_SYS_GETBOARDCONFIG, &config).return_value();
+sos_board_config_t Sys::get_board_config() {
+  sos_board_config_t result;
+  m_file.ioctl(I_SYS_GETBOARDCONFIG, &result);
+  return result;
 }
 
 #endif

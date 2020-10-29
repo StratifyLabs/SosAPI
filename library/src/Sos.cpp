@@ -1,13 +1,13 @@
 
 #if !defined __link
 #include <sos/sos.h>
-#endif
+
+#include <var/StackString.hpp>
 
 #include "sos/Sos.hpp"
 
 using namespace sos;
 
-#if !defined __link
 void Sos::powerdown(const chrono::MicroTime &duration) {
   API_RETURN_IF_ERROR();
   ::powerdown(duration.seconds());
@@ -36,14 +36,16 @@ void Sos::reset() {
 var::String Sos::launch(const Launch &options) const {
   API_RETURN_VALUE_IF_ERROR(var::String());
   var::String result;
+  const var::PathString path_string(options.path());
+  const var::GeneralString argument_string(options.arguments());
   result.resize(PATH_MAX);
   if (
     API_SYSTEM_CALL(
       "",
       ::launch(
-        options.path().cstring(),
+        path_string.cstring(),
         result.to_char(),
-        options.arguments().cstring(),
+        argument_string.cstring(),
         options.application_flags(),
         options.ram_size(),
         api::ProgressCallback::update_function,
@@ -69,6 +71,7 @@ var::String Sos::install(
   Appfs::Flags options, // run in RAM, discard on exit
   int ram_size,
   const api::ProgressCallback *progress_callback) const {
+  const var::PathString path_string(path);
   var::String result;
   result.resize(PATH_MAX);
   API_RETURN_VALUE_IF_ERROR(var::String());
@@ -76,7 +79,7 @@ var::String Sos::install(
     API_SYSTEM_CALL(
       "",
       ::install(
-        path.cstring(),
+        path_string.cstring(),
         result.to_char(),
         options,
         ram_size,
