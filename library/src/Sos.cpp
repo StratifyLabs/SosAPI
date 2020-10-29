@@ -46,7 +46,7 @@ var::String Sos::launch(const Launch &options) const {
         path_string.cstring(),
         result.to_char(),
         argument_string.cstring(),
-        options.application_flags(),
+        static_cast<int>(options.application_flags()),
         options.ram_size(),
         api::ProgressCallback::update_function,
         (void *)(options.progress_callback()), // pointer to the object
@@ -81,7 +81,7 @@ var::String Sos::install(
       ::install(
         path_string.cstring(),
         result.to_char(),
-        options,
+        static_cast<int>(options),
         ram_size,
         api::ProgressCallback::update_function,
         progress_callback))

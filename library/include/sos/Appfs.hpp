@@ -13,7 +13,7 @@ namespace sos {
 
 class AppfsFlags {
 public:
-  enum Flags {
+  enum class Flags {
     is_default = 0,
     is_flash = APPFS_FLAG_IS_FLASH,
     is_startup = APPFS_FLAG_IS_STARTUP,
@@ -30,154 +30,59 @@ public:
 
 API_OR_NAMED_FLAGS_OPERATOR(AppfsFlags, Flags)
 
-/*! \brief Application File System Class
- * \details This class provides an interface for creating data files in flash
- * memory.
- *
- * The following is a basic example of creating a data file in flash and then
- * reading from it.
- *
- * \code
- * #include <sapi/sys.hpp>
- *
- * int main(int argc, char * argv[]){
- * 	char my_user_data[16];
- * 	//populate my_user_data as you please here
- * 	sprintf(my_user_data, "Hello World!");
- * 	Appfs::create("my_data", my_user_data, 16); //creates /app/flash/my_data
- * as read only data
- * }
- * \endcode
- *
- * Now the file can be read just like any other file would be.  Of
- * course, reading files from /app/flash is very fast compared
- * to filesystems built on external chips.
- *
- * \code
- * #include <sapi/sys.hpp>
- *
- * int main(int argc, char * argv[]){
- * 	char my_user_data[16];
- * 	File f;
- * 	f.open("/app/flash/my_data", File::RDONLY); //only the file read only
- * 	f.read(my_user_data, 16); //read 16 bytes of user data
- * 	f.close();  //free resources
- * 	return 0;
- * }
- * \endcode
- *
- */
 class Appfs : public api::ExecutionContext, public AppfsFlags {
 public:
-  /*! \brief AppfsInfo Class
-   * \details The AppfsInfo class is for
-   * getting information associated with
-   * executable files that are either installed
-   * in or built for the application filesystem.
-   *
-   */
   class Info : public AppfsFlags {
   public:
-    /*! \details Constructs an empty object. */
     Info() { memset(&m_info, 0, sizeof(m_info)); }
 
-    /*! \details Constructs an object from a *appfs_info_t* object. */
     explicit Info(const appfs_info_t &info) {
       memcpy(&m_info, &info, sizeof(appfs_info_t));
     }
 
-    /*! \details Returns true if the object is valid. */
     bool is_valid() const { return m_info.signature != 0; }
 
-    /*! \details Returns the application ID (cloud id). */
     const var::StringView id() const {
       return var::StringView(reinterpret_cast<const char *>(m_info.id));
     }
 
-    /*! \details Returns the name of the application. */
     const var::StringView name() const {
       return var::StringView(reinterpret_cast<const char *>(m_info.name));
     }
 
-    /*! \details Returns the file mode. */
     u16 mode() const { return m_info.mode; }
-    /*! \details Returns the version. */
     u16 version() const { return m_info.version; }
 
-    /*! \details Returns the data RAM size used by the application. */
     u32 ram_size() const { return m_info.ram_size; }
 
-    /*! \details Returns the flags.
-     *
-     * See also: is_executable(), is_startup(), is_flash(), is_orphan(),
-     * is_root(), is_unique().
-     *
-     */
     u32 o_flags() const { return m_info.o_flags; }
 
-    /*! \details Returns the application signature.
-     *
-     * This value specifies the version of the table that
-     * connects the application to the operating system. Every
-     * OS package has a signature that is associated with
-     * the calls (such as printf(), pthread_create()) that are available to
-     * application installed on the system.
-     *
-     */
     u32 signature() const { return m_info.signature; }
-
-    /*! \details Returns true if the application is executable. */
     bool is_executable() const { return m_info.mode & 0111; }
-
-    /*! \details Returns true if the application runs at startup. */
-    bool is_startup() const {
-      return (m_info.o_flags & Flags::is_startup) != 0;
-    }
-    /*! \details Returns true if the application is to be installed in flash. */
-    bool is_flash() const { return (m_info.o_flags & Flags::is_flash) != 0; }
-    /*! \details Returns true if the application code is to be installed in
-     * external memory. */
-    bool is_code_external() const {
-      return (m_info.o_flags & Flags::is_code_external) != 0;
-    }
-    /*! \details Returns true if the application data is to be installed in
-     * external memory. */
-    bool is_data_external() const {
-      return (m_info.o_flags & Flags::is_data_external) != 0;
-    }
-    /*! \details Returns true if the application code is to be installed in
-     * tightly coupled memory. */
+    bool is_startup() const { return is_flag(Flags::is_startup); }
+    bool is_flash() const { return is_flag(Flags::is_flash); }
+    bool is_code_external() const { return is_flag(Flags::is_code_external); }
+    bool is_data_external() const { return is_flag(Flags::is_data_external); }
     bool is_code_tightly_coupled() const {
-      return (m_info.o_flags & Flags::is_code_tightly_coupled) != 0;
+      return is_flag(Flags::is_code_tightly_coupled);
     }
-    /*! \details Returns true if the application data is to be installed in
-     * tightly coupled memory. */
+
     bool is_data_tightly_coupled() const {
-      return (m_info.o_flags & Flags::is_data_tightly_coupled) != 0;
+      return is_flag(Flags::is_data_tightly_coupled);
     }
-    /*! \details Returns true if the application should run as an orphan. */
-    bool is_orphan() const { return (m_info.o_flags & Flags::is_orphan) != 0; }
-    /*! \details Returns true if the application should run as root. */
-    bool is_authenticated() const {
-      return (m_info.o_flags & Flags::is_authenticated) != 0;
-    }
-    /*! \details Returns true if the application should create a unique
-     * instance.
-     *
-     * If unique is false, the system will not allow a second copy of
-     * the application to be installed on the system.
-     *
-     * If unique is true, the application will be assigned a unique
-     * name when it is installed in RAM or flash.
-     *
-     */
-    bool is_unique() const { return (m_info.o_flags & Flags::is_unique) != 0; }
+    bool is_orphan() const { return is_flag(Flags::is_orphan); }
+    bool is_authenticated() const { return is_flag(Flags::is_authenticated); }
+    bool is_unique() const { return is_flag(Flags::is_unique); }
 
     const appfs_info_t &info() const { return m_info; }
     appfs_info_t &info() { return m_info; }
 
   private:
     appfs_info_t m_info;
+
+    bool is_flag(Flags flags) const {
+      return (static_cast<Flags>(m_info.o_flags) & flags);
+    }
   };
 
   /*! \brief Appfs::FileAttributes Class
