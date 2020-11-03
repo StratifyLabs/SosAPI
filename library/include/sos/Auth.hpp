@@ -6,6 +6,8 @@
 #include <sos/dev/auth.h>
 #include <sos/link.h>
 
+#include "Link.hpp"
+
 #include "fs/File.hpp"
 #include "var/String.hpp"
 
@@ -68,7 +70,7 @@ public:
   };
 
   Auth() {}
-  Auth(const var::StringView device FSAPI_LINK_DECLARE_DRIVER_NULLPTR_LAST);
+  Auth(var::StringView device FSAPI_LINK_DECLARE_DRIVER_NULLPTR_LAST);
 
   Auth(const Auth &a) = delete;
   Auth &operator=(const Auth &a) = delete;
@@ -89,8 +91,10 @@ public:
 private:
 #if defined __link
   API_AF(Auth, link_transport_mdriver_t *, driver, nullptr);
-#endif
+  Link::File m_file;
+#else
   fs::File m_file;
+#endif
 };
 
 } // namespace sys

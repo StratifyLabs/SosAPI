@@ -13,6 +13,13 @@
 #include <var.hpp>
 
 #include "sos/Appfs.hpp"
+#include "sos/Link.hpp"
+
+#if defined __link
+#define FILE_BASE Link
+#else
+#define FILE_BASE fs
+#endif
 
 printer::Printer &
 printer::operator<<(printer::Printer &printer, const appfs_file_t &a) {
@@ -117,8 +124,8 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
   const var::PathString path
     = var::PathString(options.mount()) / "flash" / options.name();
 
-  if (fs::FileSystem(FSAPI_LINK_MEMBER_DRIVER).exists(path)) {
-    fs::FileSystem(FSAPI_LINK_MEMBER_DRIVER).remove(path.string_view());
+  if (FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER).exists(path)) {
+    FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER).remove(path.string_view());
   }
 
   if (options.is_executable() == false) {
@@ -216,14 +223,15 @@ void Appfs::append(var::View blob) {
 bool Appfs::is_flash_available() {
   API_RETURN_VALUE_IF_ERROR(false);
   bool result
-    = fs::Dir("/app/flash" FSAPI_LINK_MEMBER_DRIVER_LAST).is_success();
+    = FILE_BASE::Dir("/app/flash" FSAPI_LINK_MEMBER_DRIVER_LAST).is_success();
   API_RESET_ERROR();
   return result;
 }
 
 bool Appfs::is_ram_available() {
   API_RETURN_VALUE_IF_ERROR(false);
-  bool result = fs::Dir("/app/ram" FSAPI_LINK_MEMBER_DRIVER_LAST).is_success();
+  bool result
+    = FILE_BASE::Dir("/app/ram" FSAPI_LINK_MEMBER_DRIVER_LAST).is_success();
   API_RESET_ERROR();
   return result;
 }
@@ -282,13 +290,14 @@ return 0;
 }
 #endif
 
-Appfs::Info Appfs::get_info(var::StringView path) {
+Appfs::Info Appfs::get_info(const var::StringView path) {
 
   appfs_file_t appfs_file_header;
-  int result
-    = fs::File(path, fs::OpenMode::read_only() FSAPI_LINK_MEMBER_DRIVER_LAST)
-        .read(var::View(appfs_file_header))
-        .return_value();
+  int result = FILE_BASE::File(
+                 path,
+                 fs::OpenMode::read_only() FSAPI_LINK_MEMBER_DRIVER_LAST)
+                 .read(var::View(appfs_file_header))
+                 .return_value();
 
   if (is_error()) {
     return Info();

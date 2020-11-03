@@ -101,7 +101,7 @@ public:
     Link link;
     usb_link_transport_load_driver(link.driver());
 
-    FileSystem device_fs(link.driver());
+    Link::FileSystem device_fs(link.driver());
     auto list = link.get_info_list();
     TEST_ASSERT(list.count() > 0);
 
@@ -190,7 +190,8 @@ public:
         TEST_ASSERT(
           DataFile().write(File(hello_world_binary_path)).data()
           == DataFile()
-               .write(File(device_path, OpenMode::read_only(), link.driver()))
+               .write(
+                 Link::File(device_path, OpenMode::read_only(), link.driver()))
                .data());
 
         TEST_ASSERT(device_fs.get_info(device_path).is_file());
@@ -286,8 +287,8 @@ public:
     TEST_ASSERT(link.reconnect(10, 200_milliseconds).is_success());
     printer().object("info", link.info());
     TEST_ASSERT(
-      list.front().serial_number()
-      == link.info().sys_info().serial_number().to_string());
+      list.front().serial_number().to_string()
+      == link.info().serial_number().to_string());
 
     TEST_ASSERT(link.reset_bootloader().is_success());
     TEST_ASSERT(link.reconnect(10, 200_milliseconds).is_bootloader());

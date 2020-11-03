@@ -4,6 +4,8 @@
 #ifndef LINKAPI_LINK_LINK_HPP_
 #define LINKAPI_LINK_LINK_HPP_
 
+#include "macros.hpp"
+
 #if defined __link
 
 #include <mcu/types.h>
@@ -18,8 +20,7 @@
 #include <var/Tokenizer.hpp>
 #include <var/Vector.hpp>
 
-#include "sos/Appfs.hpp"
-#include "sos/Sys.hpp"
+#include "SerialNumber.hpp"
 
 namespace sos {
 
@@ -31,24 +32,42 @@ public:
 
   class Info {
   public:
-    Info() {}
-    Info(const var::StringView path, const sos::Sys::Info &sys_info) {
+    Info() { m_info = {0}; }
+    Info(const var::StringView path, const sys_info_t &sys_info) {
       set_path(path);
-      set_info(sys_info);
+      m_info = sys_info;
     }
 
-    Info &set_info(const sos::Sys::Info &sys_info) {
-      m_sys_info = sys_info;
-      m_serial_number = sys_info.serial_number().to_string();
-      return *this;
-    }
+    bool is_valid() const { return cpu_frequency() != 0; }
+    var::StringView id() const { return m_info.id; }
+    var::StringView team_id() const { return m_info.team_id; }
+    var::StringView name() const { return m_info.name; }
+    var::StringView system_version() const { return m_info.sys_version; }
+    var::StringView bsp_version() const { return m_info.sys_version; }
+    var::StringView sos_version() const { return m_info.kernel_version; }
+    var::StringView kernel_version() const { return m_info.kernel_version; }
+    var::StringView cpu_architecture() const { return m_info.arch; }
+    u32 cpu_frequency() const { return m_info.cpu_freq; }
+    u32 application_signature() const { return m_info.signature; }
+    var::StringView bsp_git_hash() const { return m_info.bsp_git_hash; }
+    var::StringView sos_git_hash() const { return m_info.sos_git_hash; }
+    var::StringView mcu_git_hash() const { return m_info.mcu_git_hash; }
 
-    const var::StringView port() const { return m_path.string_view(); }
+    u32 o_flags() const { return m_info.o_flags; }
+
+    var::StringView architecture() const { return m_info.arch; }
+    var::StringView stdin_name() const { return m_info.stdin_name; }
+    var::StringView stdout_name() const { return m_info.stdout_name; }
+    var::StringView trace_name() const { return m_info.trace_name; }
+    u32 hardware_id() const { return m_info.hardware_id; }
+
+    SerialNumber serial_number() const { return SerialNumber(m_info.serial); }
+
+    const sys_info_t &sys_info() const { return m_info; }
 
   private:
     API_ACCESS_COMPOUND(Info, var::PathString, path);
-    API_READ_ACCESS_COMPOUND(Info, sos::Sys::Info, sys_info);
-    API_READ_ACCESS_COMPOUND(Info, var::KeyString, serial_number);
+    sys_info_t m_info;
   };
 
   class Path {
@@ -88,7 +107,7 @@ public:
 
     var::PathString path_description() const {
       return var::PathString(m_driver ? device_prefix() : host_prefix())
-             += m_path;
+             & m_path;
     }
 
     bool is_device_path() const { return m_driver != nullptr; }
@@ -131,6 +150,8 @@ public:
       API_AC(Construct, var::StringView, serial_number);
       API_AC(Construct, var::StringView, device_path);
     };
+
+    DriverPath() {}
 
     DriverPath(const Construct &options) {
       set_path(
@@ -349,6 +370,176 @@ public:
   }
 
   const Info &info() const { return m_link_info; }
+
+  class File : public fs::FileAccess<File> {
+  public:
+    File() {}
+
+    explicit File(
+      var::StringView name,
+      fs::OpenMode flags = fs::OpenMode::read_only(),
+      link_transport_mdriver_t *driver = nullptr);
+
+    File(
+      IsOverwrite is_overwrite,
+      var::StringView path,
+      fs::OpenMode flags = fs::OpenMode::read_write(),
+      fs::Permissions perms = fs::Permissions(0666),
+      link_transport_mdriver_t *driver = nullptr);
+
+    File(const File &file) = delete;
+    File &operator=(const File &file) = delete;
+
+    File(File &&a) {}
+    File &operator=(File &&a) {
+      std::swap(m_fd, a.m_fd);
+#if defined __link
+      std::swap(m_driver, a.m_driver);
+#endif
+      return *this;
+    }
+
+    virtual ~File();
+
+    int fileno() const;
+    int flags() const;
+    const File &sync() const;
+    File &set_fileno(int fd) {
+      m_fd = fd;
+      return *this;
+    }
+
+  protected:
+    int interface_lseek(int offset, int whence) const override;
+    int interface_read(void *buf, int nbyte) const override;
+    int interface_write(const void *buf, int nbyte) const override;
+    int interface_ioctl(int request, void *argument) const override;
+
+    int internal_fsync(int fd) const;
+
+  private:
+    API_AF(File, link_transport_mdriver_t *, driver, nullptr);
+    int m_fd = -1;
+
+    int fstat(struct stat *st);
+
+    void internal_create(
+      IsOverwrite is_overwrite,
+      var::StringView path,
+      fs::OpenMode open_mode,
+      fs::Permissions perms);
+
+    void open(
+      var::StringView name,
+      fs::OpenMode flags = fs::OpenMode::read_write(),
+      fs::Permissions perms = fs::Permissions(0666));
+
+    // open/close are part of construction/deconstruction and can't be virtual
+    void close();
+    int internal_close(int fd) const;
+    int internal_open(const char *path, int flags, int mode) const;
+  };
+
+  class Dir : public fs::DirAccess<Dir> {
+  public:
+    Dir(var::StringView path, link_transport_mdriver_t *driver = nullptr);
+
+    Dir(const Dir &dir) = delete;
+    Dir &operator=(const Dir &dir) = delete;
+    Dir(Dir &&dir) = default;
+    Dir &operator=(Dir &&dir) = default;
+
+    static const var::String filter_hidden(const var::String &entry) {
+      if (!entry.is_empty() && entry.front() == '.') {
+        return var::String();
+      }
+      return entry;
+    }
+
+    ~Dir();
+
+  protected:
+    Dir &open(var::StringView path);
+    Dir &close();
+
+    int interface_readdir_r(dirent *result, dirent **resultp) const override;
+
+    int interface_closedir() const override;
+    int interface_telldir() const override;
+    void interface_seekdir(size_t location) const override;
+    void interface_rewinddir() const override;
+
+  private:
+    API_RAC(Dir, var::PathString, path);
+    API_AF(Dir, link_transport_mdriver_t *, driver, nullptr);
+
+    DIR *m_dirp = nullptr;
+    mutable struct dirent m_entry = {0};
+
+    DIR *interface_opendir(const char *path) const;
+  };
+
+  class FileSystem : public api::ExecutionContext {
+  public:
+    using IsOverwrite = File::IsOverwrite;
+    using IsRecursive = Dir::IsRecursive;
+
+    FileSystem(link_transport_mdriver_t *driver);
+
+    bool exists(var::StringView path) const;
+
+    const FileSystem &remove(var::StringView path) const;
+    const FileSystem &remove_directory(var::StringView path) const;
+
+    const FileSystem &
+    remove_directory(var::StringView path, IsRecursive recursive) const;
+
+    bool directory_exists(var::StringView path) const;
+
+    const FileSystem &create_directory(
+      var::StringView path,
+      const fs::Permissions &permissions = fs::Permissions(0)) const;
+
+    const FileSystem &create_directory(
+      var::StringView path,
+      IsRecursive is_recursive,
+      const fs::Permissions &permissions = fs::Permissions(0)) const;
+
+    fs::PathList read_directory(
+      const fs::DirObject &directory,
+      IsRecursive is_recursive = IsRecursive::no,
+      bool (*exclude)(var::StringView) = nullptr) const;
+
+    class Rename {
+      API_AC(Rename, var::StringView, source);
+      API_AC(Rename, var::StringView, destination);
+    };
+
+    const FileSystem &rename(const Rename &options) const;
+    inline const FileSystem &operator()(const Rename &options) const {
+      return rename(options);
+    }
+
+    const FileSystem &touch(var::StringView path) const;
+
+    fs::FileInfo get_info(var::StringView path) const;
+    fs::FileInfo get_info(const File &file) const;
+
+  protected:
+    fs::Permissions get_permissions(var::StringView path) const;
+
+    int interface_mkdir(const char *path, int mode) const;
+    int interface_rmdir(const char *path) const;
+    int interface_unlink(const char *path) const;
+    int interface_stat(const char *path, struct stat *stat) const;
+    int interface_fstat(int fd, struct stat *stat) const;
+    int interface_rename(const char *old_name, const char *new_name) const;
+
+  private:
+#ifdef __link
+    API_AF(FileSystem, link_transport_mdriver_t *, driver, nullptr);
+#endif
+  };
 
 private:
   volatile int m_progress = 0;

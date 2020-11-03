@@ -6,6 +6,7 @@
 
 #include "api/api.hpp"
 
+#include "Link.hpp"
 #include "fs/File.hpp"
 #include "var/String.hpp"
 
@@ -85,21 +86,6 @@ public:
     }
   };
 
-  /*! \brief Appfs::FileAttributes Class
-   * \details The Appfs::FileAttributes class holds the
-   * information that is needed to modify an application
-   * binary that has been built with the compiler.
-   *
-   * The compiler is unable to build some information
-   * directly into the binary but it allocates space
-   * for the information.
-   *
-   * This class is used for that information and includes
-   * things like the application name, project id,
-   * and execution flags.
-   *
-   *
-   */
   class FileAttributes : public AppfsFlags {
   public:
     FileAttributes(const fs::FileObject &existing);
@@ -236,58 +222,16 @@ public:
   bool is_flash_available();
   bool is_ram_available();
 
-  /*! \details Returns the page size for writing data. */
   static constexpr int page_size() { return APPFS_PAGE_SIZE; }
   static constexpr u32 overhead() { return sizeof(appfs_file_t); }
 
-  /*! \details Gets the info associated with an executable file.
-   *
-   * @param path The path to the file
-   * @param info A reference to the destination info
-   * @return Zero on success
-   *
-   * This method will work if the file is installed in the
-   * application filesystem or on a normal data filesystem.
-   *
-   * The method will return less than zero if the file is not
-   * a recognized executable file.
-   *
-   * The errno will be set to ENOENT or ENOEXEC if the file
-   * does not exist or is not a recognized executable, respectively.
-   *
-   */
-  Info get_info(var::StringView path);
+  Info get_info(const var::StringView path);
 
 #if !defined __link
 
   enum class CleanData { no, yes };
-
   Appfs &cleanup(CleanData clean_data);
-
-  /*! \details Frees the RAM associated with the app without deleting the code
-   * from flash (should not be called when the app is currently running).
-   *
-   * @param path The path to the app (use \a exec_dest from launch())
-   * @param driver Used with link protocol only
-   * @return Zero on success
-   *
-   * This method can causes problems if not used correctly. The RAM associated
-   * with the app will be free and available for other applications. Any
-   * applications that are using the RAM must quit before the RAM can be
-   * reclaimed using reclaim_ram().
-   *
-   * \sa reclaim_ram()
-   */
   Appfs &free_ram(var::StringView path);
-
-  /*! \details Reclaims RAM that was freed using free_ram().
-   *
-   * @param path The path to the app
-   * @param driver Used with link protocol only
-   * @return Zero on success
-   *
-   * \sa free_ram()
-   */
   Appfs &reclaim_ram(var::StringView path);
 
 #endif
@@ -295,9 +239,11 @@ public:
 private:
 #if defined __link
   API_AF(Appfs, link_transport_mdriver_t *, driver, nullptr);
+  Link::File m_file;
+#else
+  fs::File m_file;
 #endif
 
-  fs::File m_file;
   appfs_createattr_t m_create_install_attributes = {0};
   u32 m_bytes_written = 0;
   u32 m_data_size = 0;

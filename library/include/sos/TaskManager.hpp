@@ -6,6 +6,9 @@
 
 #include <sos/dev/sys.h>
 
+#include "macros.hpp"
+
+#include "Link.hpp"
 #include "fs/File.hpp"
 #include "thread/Sched.hpp"
 #include "var/StringView.hpp"
@@ -175,7 +178,11 @@ public:
   const TaskManager &kill_pid(int pid, int signo) const;
 
 private:
+#if defined __link
+  Link::File m_sys_device;
+#else
   fs::File m_sys_device;
+#endif
 };
 
 } // namespace sos

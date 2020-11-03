@@ -13,11 +13,13 @@
 #include <string>
 
 #include <chrono.hpp>
-#include <fs.hpp>
+#include <fs/File.hpp>
+#include <fs/Path.hpp>
 #include <var.hpp>
 
 #include "sos/Appfs.hpp"
 #include "sos/Link.hpp"
+#include "sos/Sys.hpp"
 
 #define MAX_TRIES 3
 
@@ -25,7 +27,7 @@ namespace printer {
 class Printer;
 Printer &operator<<(Printer &printer, const sos::Link::Info &a) {
   printer.key("path", a.path());
-  printer.object("systemInformation", a.sys_info());
+  printer.object("systemInformation", sos::Sys::Info(a.sys_info()));
   return printer;
 }
 
@@ -168,7 +170,7 @@ Link &Link::reconnect(int retries, chrono::MicroTime delay) {
   API_RETURN_VALUE_IF_ERROR(*this);
   Info last_info(info());
   for (u32 i = 0; i < retries; i++) {
-    connect(last_info.port());
+    connect(last_info.path());
 
     if (is_success()) {
       if (last_info.serial_number() == info().serial_number()) {
@@ -818,6 +820,431 @@ var::String Link::DriverPath::lookup_serial_port_path_from_usb_details() {
 
 #endif
   return var::String();
+}
+
+Link::File::File(
+  var::StringView name,
+  fs::OpenMode flags,
+  link_transport_mdriver_t *driver) {
+  set_driver(driver);
+  open(name, flags);
+}
+
+Link::File::File(
+  IsOverwrite is_overwrite,
+  var::StringView path,
+  fs::OpenMode open_mode,
+  fs::Permissions perms,
+  link_transport_mdriver_t *driver) {
+  set_driver(driver);
+  internal_create(is_overwrite, path, open_mode, perms);
+}
+
+Link::File::~File() {
+  if (fileno() >= 0) {
+    close();
+  }
+}
+
+int Link::File::fileno() const { return m_fd; }
+
+const Link::File &Link::File::sync() const {
+  API_RETURN_VALUE_IF_ERROR(*this);
+#if defined __link
+  if (driver()) {
+    return *this;
+  }
+#endif
+  if (m_fd >= 0) {
+#if !defined __win32
+    API_SYSTEM_CALL("", internal_fsync(m_fd));
+#else
+    ret = 0;
+#endif
+  }
+  return *this;
+}
+
+int Link::File::flags() const {
+  API_RETURN_VALUE_IF_ERROR(-1);
+#if defined __link
+  return -1;
+#else
+  if (fileno() < 0) {
+    API_SYSTEM_CALL("", -1);
+    return return_value();
+  }
+  return _global_impure_ptr->procmem_base->open_file[m_fd].flags;
+#endif
+}
+
+int Link::File::fstat(struct stat *st) {
+  API_RETURN_VALUE_IF_ERROR(-1);
+  return API_SYSTEM_CALL("", link_fstat(driver(), m_fd, st));
+}
+
+void Link::File::close() {
+  if (m_fd >= 0) {
+    internal_close(m_fd);
+    m_fd = -1;
+  }
+}
+
+int Link::File::internal_open(const char *path, int flags, int mode) const {
+  return link_open(driver(), path, flags, mode);
+}
+
+int Link::File::interface_read(void *buf, int nbyte) const {
+  return link_read(driver(), m_fd, buf, nbyte);
+}
+
+int Link::File::interface_write(const void *buf, int nbyte) const {
+  return link_write(driver(), m_fd, buf, nbyte);
+}
+
+int Link::File::interface_ioctl(int request, void *argument) const {
+  return link_ioctl(driver(), m_fd, request, argument);
+}
+
+int Link::File::internal_close(int fd) const {
+  return link_close(driver(), fd);
+}
+
+int Link::File::internal_fsync(int fd) const {
+#if defined __link
+  return 0;
+#else
+  return ::fsync(fd);
+#endif
+}
+
+int Link::File::interface_lseek(int offset, int whence) const {
+  return link_lseek(driver(), m_fd, offset, whence);
+}
+
+void Link::File::open(
+  var::StringView path,
+  OpenMode flags,
+  Permissions permissions) {
+  API_ASSERT(m_fd == -1);
+  API_RETURN_IF_ERROR();
+  const var::PathString path_string(path);
+  API_SYSTEM_CALL(
+    path_string.cstring(),
+    m_fd = internal_open(
+      path_string.cstring(),
+      static_cast<int>(flags.o_flags()),
+      permissions.permissions()));
+}
+
+void Link::File::internal_create(
+  IsOverwrite is_overwrite,
+  var::StringView path,
+  OpenMode open_mode,
+  Permissions perms) {
+  OpenMode flags = OpenMode(open_mode).set_create();
+  if (is_overwrite == IsOverwrite::yes) {
+    flags.set_truncate();
+  } else {
+    flags.set_exclusive();
+  }
+
+  open(path, flags, perms);
+}
+
+Link::Dir::Dir(var::StringView path, link_transport_mdriver_t *driver) {
+  set_driver(driver);
+  open(path);
+}
+
+Link::Dir::~Dir() { close(); }
+
+Link::Dir &Link::Dir::open(var::StringView path) {
+  API_RETURN_VALUE_IF_ERROR(*this);
+  const var::PathString path_string(path);
+  m_dirp = API_SYSTEM_CALL_NULL(
+    path_string.cstring(),
+    interface_opendir(path_string.cstring()));
+  if (m_dirp) {
+    m_path = path_string;
+  }
+  return *this;
+}
+
+Link::Dir &Link::Dir::close() {
+  API_RETURN_VALUE_IF_ERROR(*this);
+  if (m_dirp) {
+    API_SYSTEM_CALL(m_path.cstring(), interface_closedir());
+    m_dirp = nullptr;
+  }
+
+  m_path.clear();
+  return *this;
+}
+
+DIR *Link::Dir::interface_opendir(const char *path) const {
+  return reinterpret_cast<DIR *>(link_opendir(driver(), path));
+}
+
+int Link::Dir::interface_readdir_r(
+  struct dirent *result,
+  struct dirent **resultp) const {
+  return link_readdir_r(driver(), m_dirp, result, resultp);
+}
+
+int Link::Dir::interface_closedir() const {
+  return link_closedir(driver(), m_dirp);
+}
+
+int Link::Dir::interface_telldir() const {
+  return link_telldir(driver(), m_dirp);
+}
+
+void Link::Dir::interface_seekdir(size_t location) const {
+  link_seekdir(driver(), m_dirp, location);
+}
+
+void Link::Dir::interface_rewinddir() const {
+  link_rewinddir(driver(), m_dirp);
+}
+
+Link::FileSystem::FileSystem(link_transport_mdriver_t *driver) {
+  set_driver(driver);
+}
+
+const Link::FileSystem &Link::FileSystem::remove(var::StringView path) const {
+  API_RETURN_VALUE_IF_ERROR(*this);
+  const var::PathString path_string(path);
+  API_SYSTEM_CALL(
+    path_string.cstring(),
+    interface_unlink(path_string.cstring()));
+  return *this;
+}
+
+const Link::FileSystem &Link::FileSystem::touch(var::StringView path) const {
+  API_RETURN_VALUE_IF_ERROR(*this);
+  char c;
+  API_SYSTEM_CALL(
+    "",
+    File(path, OpenMode::read_write(), driver())
+      .read(var::View(c))
+      .seek(0)
+      .write(var::View(c))
+      .return_value());
+  return *this;
+}
+
+const Link::FileSystem &Link::FileSystem::rename(const Rename &options) const {
+  API_RETURN_VALUE_IF_ERROR(*this);
+  const var::PathString source_string(options.source());
+  const var::PathString dest_string(options.destination());
+  API_SYSTEM_CALL(
+    source_string.cstring(),
+    interface_rename(source_string.cstring(), dest_string.cstring()));
+  return *this;
+}
+
+bool Link::FileSystem::exists(var::StringView path) const {
+  API_RETURN_VALUE_IF_ERROR(false);
+  bool result = File(path, OpenMode::read_only(), driver()).is_success();
+  reset_error();
+  return result;
+}
+
+fs::FileInfo Link::FileSystem::get_info(var::StringView path) const {
+  API_RETURN_VALUE_IF_ERROR(FileInfo());
+  const var::PathString path_string(path);
+  struct stat stat = {0};
+  API_SYSTEM_CALL(
+    path_string.cstring(),
+    interface_stat(path_string.cstring(), &stat));
+  return FileInfo(stat);
+}
+
+fs::FileInfo Link::FileSystem::get_info(const File &file) const {
+  API_RETURN_VALUE_IF_ERROR(FileInfo());
+  struct stat stat = {0};
+  API_SYSTEM_CALL("", interface_fstat(file.fileno(), &stat));
+  return FileInfo(stat);
+}
+
+const Link::FileSystem &Link::FileSystem::remove_directory(
+  var::StringView path,
+  IsRecursive recursive) const {
+
+  if (recursive == IsRecursive::yes) {
+    Dir d(path);
+
+    var::String entry;
+    while ((entry = d.read()).is_empty() == false) {
+      var::String entry_path = path + "/" + entry;
+      FileInfo info = get_info(entry_path);
+      if (info.is_directory()) {
+        if (entry != "." && entry != "..") {
+          if (remove_directory(entry_path, recursive).is_error()) {
+            return *this;
+          }
+        }
+
+      } else {
+        if (remove(entry_path).is_error()) {
+          return *this;
+        }
+      }
+    }
+  }
+
+  remove_directory(path);
+  return *this;
+}
+
+const Link::FileSystem &
+Link::FileSystem::remove_directory(var::StringView path) const {
+  API_RETURN_VALUE_IF_ERROR(*this);
+  const var::PathString path_string(path);
+  API_SYSTEM_CALL(
+    path_string.cstring(),
+    interface_rmdir(path_string.cstring()));
+  return *this;
+}
+
+PathList Link::FileSystem::read_directory(
+  const fs::DirObject &directory,
+  IsRecursive is_recursive,
+  bool (*exclude)(var::StringView entry)) const {
+  PathList result;
+  bool is_the_end = false;
+
+  do {
+    const char *entry_result = directory.read();
+    const var::PathString entry = (entry_result != nullptr)
+                                    ? var::PathString(entry_result)
+                                    : var::PathString();
+
+    if (entry.is_empty()) {
+      is_the_end = true;
+    }
+
+    if (
+      (exclude == nullptr || !exclude(entry.string_view())) && !entry.is_empty()
+      && (entry.string_view() != ".") && (entry.string_view() != "..")) {
+
+      if (is_recursive == IsRecursive::yes) {
+
+        const var::PathString entry_path
+          = var::PathString(directory.path()) / entry.string_view();
+        FileInfo info = get_info(entry_path.cstring());
+
+        if (info.is_directory()) {
+          PathList intermediate_result = read_directory(
+            Link::Dir(entry_path, driver()),
+            is_recursive,
+            exclude);
+
+          for (const auto &intermediate_entry : intermediate_result) {
+            const var::PathString intermediate_path
+              = var::PathString(entry_path) / intermediate_entry;
+
+            result.push_back(intermediate_path);
+          }
+        } else {
+          result.push_back(entry_path);
+        }
+      } else {
+        result.push_back(entry);
+      }
+    }
+  } while (!is_the_end);
+
+  return std::move(result);
+}
+
+bool Link::FileSystem::directory_exists(var::StringView path) const {
+  API_RETURN_VALUE_IF_ERROR(false);
+  bool result = Dir(path).is_success();
+  reset_error();
+  return result;
+}
+
+fs::Permissions Link::FileSystem::get_permissions(var::StringView path) const {
+  const var::StringView parent = fs::Path::parent_directory(path);
+  if (parent.is_empty()) {
+    return get_info(".").permissions();
+  }
+
+  return get_info(parent).permissions();
+}
+
+const Link::FileSystem &Link::FileSystem::create_directory(
+  var::StringView path,
+  const Permissions &permissions) const {
+
+  const Permissions use_permissions
+    = permissions.permissions() == 0 ? get_permissions(path) : permissions;
+
+  const var::PathString path_string(path);
+  API_SYSTEM_CALL(
+    path_string.cstring(),
+    interface_mkdir(path_string.cstring(), use_permissions.permissions()));
+  return *this;
+}
+
+const Link::FileSystem &Link::FileSystem::create_directory(
+  var::StringView path,
+  IsRecursive is_recursive,
+  const Permissions &permissions) const {
+
+  if (is_recursive == IsRecursive::no) {
+    return create_directory(path, permissions);
+  }
+
+  var::Tokenizer path_tokens
+    = var::Tokenizer(path, var::Tokenizer::Construct().set_delimeters("/"));
+  var::String base_path;
+
+  // tokenizer will strip the first / and create an empty token
+  if (path.length() && path.front() == '/') {
+    base_path += "/";
+  }
+
+  for (u32 i = 0; i < path_tokens.count(); i++) {
+    if (path_tokens.at(i).is_empty() == false) {
+      base_path += path_tokens.at(i);
+      if (create_directory(base_path.cstring(), permissions).is_error()) {
+        return *this;
+      }
+      base_path += "/";
+    }
+  }
+
+  return *this;
+}
+
+int Link::FileSystem::interface_mkdir(const char *path, int mode) const {
+  return link_mkdir(driver(), path, mode);
+}
+
+int Link::FileSystem::interface_rmdir(const char *path) const {
+  return link_rmdir(driver(), path);
+}
+
+int Link::FileSystem::interface_unlink(const char *path) const {
+  return link_unlink(driver(), path);
+}
+
+int Link::FileSystem::interface_stat(const char *path, struct stat *stat)
+  const {
+  return link_stat(driver(), path, stat);
+}
+
+int Link::FileSystem::interface_fstat(int fd, struct stat *stat) const {
+  return link_fstat(driver(), fd, stat);
+}
+
+int Link::FileSystem::interface_rename(
+  const char *old_name,
+  const char *new_name) const {
+  return link_rename(driver(), old_name, new_name);
 }
 
 #else

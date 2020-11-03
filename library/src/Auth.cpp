@@ -33,9 +33,9 @@ void Auth::Token::populate(var::View data) {
   memcpy(&m_auth_token, data.to_const_void(), size);
 }
 
-Auth::Auth(const var::StringView device_path FSAPI_LINK_DECLARE_DRIVER_LAST)
+Auth::Auth(const var::StringView path FSAPI_LINK_DECLARE_DRIVER_LAST)
   : m_file(
-    device_path.is_empty() ? "/dev/sys" : device_path,
+    path.is_empty() ? "/dev/auth" : path,
     fs::OpenMode::read_write() FSAPI_LINK_INHERIT_DRIVER_LAST) {}
 
 bool Auth::authenticate(var::View key) {
