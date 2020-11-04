@@ -1,4 +1,4 @@
-/*! \file */ // Copyright 2011-2020 Tyler Gilbert and Stratify Labs, Inc; see
+﻿/*! \file */ // Copyright 2011-2020 Tyler Gilbert and Stratify Labs, Inc; see
              // LICENSE.md for rights.
 /* Copyright 2016-2018 Tyler Gilbert ALl Rights Reserved */
 
@@ -96,6 +96,7 @@ var::Vector<Link::Info> Link::get_info_list() {
 }
 
 Link::Connection Link::ping_connection(const var::StringView path) {
+  API_RETURN_VALUE_IF_ERROR(Connection::null);
   if (driver()->phy_driver.handle == LINK_PHY_OPEN_ERROR) {
     driver()->transport_version = 0;
     const var::PathString path_string(path);
@@ -104,7 +105,10 @@ Link::Connection Link::ping_connection(const var::StringView path) {
       path_string.cstring(),
       driver()->phy_driver.open(path_string.cstring(), driver()->options));
 
-    API_RETURN_VALUE_IF_ERROR(Connection::null);
+    if (is_error()) {
+      disregard_connection();
+      API_RETURN_VALUE_IF_ERROR(Connection::null);
+    }
   }
 
   int err;
@@ -121,12 +125,12 @@ Link::Connection Link::ping_connection(const var::StringView path) {
   }
 
   driver()->phy_driver.close(&driver()->phy_driver.handle);
+  driver()->phy_driver.handle = LINK_PHY_OPEN_ERROR;
   return Connection::null;
 }
 
 Link &Link::connect(var::StringView path, IsLegacy is_legacy) {
   API_RETURN_VALUE_IF_ERROR(*this);
-  int err = -1;
 
   if (is_connected() && info().path() != path) {
     API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
@@ -163,6 +167,7 @@ Link &Link::connect(var::StringView path, IsLegacy is_legacy) {
       sizeof(mcu_sn_t));
   }
 
+  m_link_info = Info(path, sys_info);
   return *this;
 }
 
@@ -253,14 +258,18 @@ bool Link::is_connected() const {
   return true;
 }
 
-bool Link::ping(const var::StringView path) {
+bool Link::ping(
+  const var::StringView path,
+  IsKeepConnection is_keep_connection) {
   API_RETURN_VALUE_IF_ERROR(false);
   Connection connection = ping_connection(path);
   if (connection == Connection::null) {
     API_RESET_ERROR();
     return false;
   }
-
+  if (is_keep_connection == IsKeepConnection::no) {
+    disconnect();
+  }
   return true;
 }
 
@@ -795,7 +804,6 @@ Link &Link::update_os(const UpdateOs &options) {
     API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
   }
 
-  printf("%s():%d\n", __FUNCTION__, __LINE__);
   u32 image_id
     = validate_os_image_id_with_connected_bootloader(options.image());
 
@@ -805,9 +813,7 @@ Link &Link::update_os(const UpdateOs &options) {
 
   const var::KeyString progress_key = options.printer()->progress_key();
 
-  printf("%s():%d\n", __FUNCTION__, __LINE__);
   erase_os(options);
-  printf("%s():%d\n", __FUNCTION__, __LINE__);
   install_os(image_id, options);
 
   options.printer()->set_progress_key(progress_key);

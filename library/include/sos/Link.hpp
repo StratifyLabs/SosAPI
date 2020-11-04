@@ -26,9 +26,10 @@ namespace sos {
 
 class Link : public api::ExecutionContext {
 public:
-  enum class Type { serial, usb };
+  enum class Type { null, serial, usb };
   enum class IsLegacy { no, yes };
   enum class IsBootloader { no, yes };
+  enum class IsKeepConnection { no, yes };
 
   class Info {
   public:
@@ -129,13 +130,15 @@ public:
 
   /*
    * /
-   * <driver>/
+   * usb/
    * <vendor id>/
    * <product id>/
    * <interface number>/
-   * <serial number>/
-   * <device path>
-   * ```
+   * <serial number>
+   *
+   * /
+   * serial/
+   * device_path
    *
    * - `<driver>` can be `serial` or `usb`
    *
@@ -189,7 +192,10 @@ public:
       if (get_driver_name() == "usb") {
         return Type::usb;
       }
-      return Type::serial;
+      if (get_driver_name() == "serial") {
+        return Type::serial;
+      }
+      return Type::null;
     }
 
     var::StringView get_driver_name() const {
@@ -197,23 +203,38 @@ public:
     }
 
     var::StringView get_vendor_id() const {
-      return get_value_at_position(Position::vendor_id);
+      if (get_type() == Type::usb) {
+        return get_value_at_position(Position::vendor_id);
+      }
+      return var::StringView();
     }
 
     var::StringView get_product_id() const {
-      return get_value_at_position(Position::product_id);
+      if (get_type() == Type::usb) {
+        return get_value_at_position(Position::product_id);
+      }
+      return var::StringView();
     }
 
     var::StringView get_interface_number() const {
-      return get_value_at_position(Position::interface_number);
+      if (get_type() == Type::usb) {
+        return get_value_at_position(Position::interface_number);
+      }
+      return var::StringView();
     }
 
     var::StringView get_serial_number() const {
-      return get_value_at_position(Position::serial_number);
+      if (get_type() == Type::usb) {
+        return get_value_at_position(Position::serial_number);
+      }
+      return var::StringView();
     }
 
     var::StringView get_device_path() const {
-      return get_value_at_position(Position::device_path);
+      if (get_type() == Type::serial) {
+        return get_value_at_position(Position::device_path);
+      }
+      return var::StringView();
     }
 
     bool operator==(const DriverPath &a) const {
@@ -263,8 +284,8 @@ public:
       product_id,
       interface_number,
       serial_number,
-      device_path,
-      last_position = device_path
+      device_path = vendor_id,
+      last_position = serial_number
     };
 
     var::StringView get_value_at_position(Position position) const {
@@ -308,7 +329,9 @@ public:
   Link &disconnect();
   Link &disregard_connection();
 
-  bool ping(const var::StringView path);
+  bool ping(
+    const var::StringView path,
+    IsKeepConnection is_keep_connection = IsKeepConnection::no);
   bool is_connected() const;
 
   static var::KeyString convert_permissions(link_mode_t mode);
