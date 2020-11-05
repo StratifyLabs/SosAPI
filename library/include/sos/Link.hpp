@@ -552,7 +552,7 @@ public:
       const fs::Permissions &permissions = fs::Permissions(0)) const;
 
     fs::PathList read_directory(
-      const fs::DirObject &directory,
+      const var::StringView path,
       IsRecursive is_recursive = IsRecursive::no,
       bool (*exclude)(var::StringView) = nullptr) const;
 

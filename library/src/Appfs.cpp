@@ -141,7 +141,7 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
     var::View(f->hdr.name)
       .fill<u8>(0)
       .truncate(sizeof((f->hdr.name)))
-      .copy(options.name());
+      .copy(fs::Path::name(options.name()));
 
     f->hdr.mode = 0666;
     f->exec.code_size
@@ -177,6 +177,10 @@ Appfs &Appfs::append(
     if (progress_callback) {
       progress_callback->update(bytes_written, file_size);
     }
+  }
+
+  if (progress_callback) {
+    progress_callback->update(0, 0);
   }
 
   return *this;
