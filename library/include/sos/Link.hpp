@@ -165,23 +165,16 @@ public:
     }
 
     DriverPath(const var::StringView driver_path) {
-      API_ASSERT(is_valid(driver_path));
       set_path(driver_path);
     }
 
-    static bool is_valid(const var::StringView driver) {
-      const auto list = driver.split("/");
-      if (list.count() < 2) {
-        return false;
+    bool is_valid() const {
+
+      if (path().is_empty()) {
+        return true;
       }
 
-      if (list.at(0).is_empty() == false) {
-        return false;
-      }
-
-      if (
-        list.at(get_position(Position::driver_name)) != "usb"
-        && list.at(get_position(Position::driver_name)) != "serial") {
+      if (get_type() == Type::null) {
         return false;
       }
 
@@ -237,9 +230,43 @@ public:
       return var::StringView();
     }
 
+    bool is_partial() const {
+      if (get_type() == Type::usb) {
+        if (get_vendor_id().is_empty()) {
+          return true;
+        }
+
+        if (get_product_id().is_empty()) {
+          return true;
+        }
+
+        if (get_serial_number().is_empty()) {
+          return true;
+        }
+
+        if (get_interface_number().is_empty()) {
+          return true;
+        }
+
+        return false;
+      }
+
+      if (get_type() == Type::serial) {
+        return get_device_path().is_empty();
+      }
+
+      return true;
+    }
+
     bool operator==(const DriverPath &a) const {
       // if both values are provided and they are not the same -- they are not
-      // the same
+
+      if (
+        (get_type() != Type::null) && (a.get_type() != Type::null)
+        && (get_type() != a.get_type())) {
+        return false;
+      }
+
       if (
         !get_vendor_id().is_empty() && !a.get_vendor_id().is_empty()
         && (get_vendor_id() != a.get_vendor_id())) {
@@ -261,11 +288,7 @@ public:
         && (get_serial_number() != a.get_serial_number())) {
         return false;
       }
-      if (
-        !get_driver_name().is_empty() && !a.get_driver_name().is_empty()
-        && (get_driver_name() != a.get_driver_name())) {
-        return false;
-      }
+
       if (
         !get_device_path().is_empty() && !a.get_device_path().is_empty()
         && (get_device_path() != a.get_device_path())) {

@@ -310,7 +310,7 @@ public:
                                    .set_device_path("/dev/serial.tty"));
 
     printer().key("path", driver_path.path());
-    TEST_ASSERT(Link::DriverPath::is_valid(driver_path.path()));
+    TEST_ASSERT(driver_path.is_valid());
     TEST_ASSERT(driver_path.get_type() == Link::Type::usb);
     TEST_ASSERT(driver_path.get_driver_name() == "usb");
     TEST_ASSERT(driver_path.get_vendor_id() == "0x4100");
@@ -321,7 +321,7 @@ public:
 
     {
       Link::DriverPath string_driver_path(driver_path.path());
-      TEST_ASSERT(Link::DriverPath::is_valid(string_driver_path.path()));
+      TEST_ASSERT(string_driver_path.is_valid());
       TEST_ASSERT(string_driver_path.get_type() == Link::Type::usb);
       TEST_ASSERT(string_driver_path.get_driver_name() == "usb");
       TEST_ASSERT(string_driver_path.get_vendor_id() == "0x4100");

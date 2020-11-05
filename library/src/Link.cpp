@@ -182,6 +182,8 @@ Link &Link::reconnect(int retries, chrono::MicroTime delay) {
         return *this;
       }
       disconnect();
+    } else {
+      API_RESET_ERROR();
     }
 
     fs::PathList port_list = get_path_list();
@@ -193,10 +195,12 @@ Link &Link::reconnect(int retries, chrono::MicroTime delay) {
           return *this;
         }
         disconnect();
+      } else {
+        API_RESET_ERROR();
       }
     }
 
-    delay.wait();
+    chrono::wait(delay);
   }
 
   // restore the last known information on failure
@@ -503,7 +507,9 @@ Link &Link::get_bootloader_attr(bootloader_attr_t &attr) {
     err = link_bootloader_attr(driver(), &attr, 0);
   }
 
-  API_SYSTEM_CALL("", err);
+  if (err < 0) {
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
+  }
 
   return *this;
 }
@@ -559,6 +565,7 @@ Link &Link::erase_os(const UpdateOs &options) {
 
   options.printer()->set_progress_key("erasing");
 
+
   // first erase the flash
   API_SYSTEM_CALL("", link_eraseflash(driver()));
   API_RETURN_VALUE_IF_ERROR(*this);
@@ -569,29 +576,32 @@ Link &Link::erase_os(const UpdateOs &options) {
       api::ProgressCallback::indeterminate_progress_total());
   }
 
-  int err;
-  bootloader_attr_t attr;
-  memset(&attr, 0, sizeof(attr));
+  bootloader_attr_t attr = {0};
   int retry = 0;
+  bool is_waiting = true;
   do {
+    API_RESET_ERROR();
     chrono::wait(500_milliseconds);
+    get_bootloader_attr(attr);
+    // api::ErrorGuard error_guard;
     if (is_error()) {
       API_RESET_ERROR();
       driver()->phy_driver.flush(driver()->phy_driver.handle);
+    } else {
+      is_waiting = false;
     }
-    get_bootloader_attr(attr);
 
     if (progress_callback) {
       progress_callback->update(
         retry,
         api::ProgressCallback::indeterminate_progress_total());
     }
-  } while ((is_error()) && (retry++ < options.bootloader_retry_count()));
-  bool is_error_state = is_error();
+  } while (is_waiting && (retry++ < options.bootloader_retry_count()));
+
+  const bool is_error_state = is_error();
 
   chrono::wait(250_milliseconds);
 
-  API_RESET_ERROR();
   // flush just incase the protocol gets filled with get attr requests
   driver()->phy_driver.flush(driver()->phy_driver.handle);
 
