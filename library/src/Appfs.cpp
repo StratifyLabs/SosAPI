@@ -101,10 +101,13 @@ Appfs::FileAttributes::FileAttributes(const fs::FileObject &existing) {
 
 const Appfs::FileAttributes &
 Appfs::FileAttributes::apply(const fs::FileObject &file) const {
-  int location = file.location();
+  const int location = file.location();
+  const size_t size = file.size();
   file.seek(0)
     .write(var::View(m_file_header))
     .seek(location, fs::File::Whence::set);
+
+  API_ASSERT((file.size() == size) || (file.size() == sizeof(m_file_header)));
 
   return *this;
 }
@@ -169,11 +172,12 @@ Appfs &Appfs::append(
 
   var::Array<char, APPFS_PAGE_SIZE> buffer;
 
-  var::View(buffer).fill(0);
+  var::View buffer_view(buffer);
+  buffer_view.fill(0);
 
   size_t bytes_written = 0;
   const size_t file_size = file.size();
-  while (file.read(View(buffer)).return_value() > 0) {
+  while (file.read(buffer_view).return_value() > 0) {
     bytes_written += return_value();
     append(var::View(buffer).truncate(return_value()));
     if (progress_callback) {
@@ -201,11 +205,6 @@ void Appfs::append(var::View blob) {
       page_size = page_size_available;
     }
 
-    printf(
-      "copy to buffer %d then %d, %d\n",
-      page_offset,
-      bytes_written,
-      page_size);
     memcpy(
       m_create_install_attributes.buffer + page_offset,
       blob.to_const_u8() + bytes_written,
