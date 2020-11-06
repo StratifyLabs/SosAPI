@@ -159,7 +159,9 @@ public:
 
     u32 ram_size() const { return m_file_header.exec.ram_size; }
     FileAttributes &set_ram_size(u32 value) {
-      m_file_header.exec.ram_size = value;
+      if (value > 0) {
+        m_file_header.exec.ram_size = value;
+      }
       return *this;
     }
 
@@ -231,7 +233,7 @@ public:
 
 #if !defined __link
 
-  enum class CleanData { no, yes };
+  enum class CleanData{no, yes};
   Appfs &cleanup(CleanData clean_data);
   Appfs &free_ram(var::StringView path);
   Appfs &reclaim_ram(var::StringView path);
