@@ -98,6 +98,8 @@ public:
       return static_cast<Flags>(m_file_header.exec.o_flags);
     }
 
+    u32 signature() const { return m_file_header.exec.signature; }
+
     bool is_flash() const { return flags() & Flags::is_flash; }
     bool is_code_external() const { return flags() & Flags::is_code_external; }
     bool is_data_external() const { return flags() & Flags::is_data_external; }

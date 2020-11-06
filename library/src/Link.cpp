@@ -583,7 +583,6 @@ Link &Link::erase_os(const UpdateOs &options) {
     API_RESET_ERROR();
     chrono::wait(500_milliseconds);
     get_bootloader_attr(attr);
-    // api::ErrorGuard error_guard;
     if (is_error()) {
       API_RESET_ERROR();
       driver()->phy_driver.flush(driver()->phy_driver.handle);
@@ -601,7 +600,6 @@ Link &Link::erase_os(const UpdateOs &options) {
   const bool is_error_state = is_error();
 
   chrono::wait(250_milliseconds);
-
   // flush just incase the protocol gets filled with get attr requests
   driver()->phy_driver.flush(driver()->phy_driver.handle);
 

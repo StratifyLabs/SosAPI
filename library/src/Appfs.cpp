@@ -25,7 +25,7 @@ printer::Printer &
 printer::operator<<(printer::Printer &printer, const appfs_file_t &a) {
   printer.key("name", var::StringView(a.hdr.name));
   printer.key("id", var::StringView(a.hdr.id));
-  printer.key("mode", var::NumberString(a.hdr.mode, "0%o").string_view());
+  printer.key("mode", var::NumberString(a.hdr.mode, "0%o"));
   printer.key(
     "version",
     var::NumberString()
@@ -59,6 +59,7 @@ printer::Printer &printer::operator<<(
     "version",
     var::String().format("%d.%d", a.version() >> 8, a.version() & 0xff));
 
+  printer.key("signature", var::NumberString(a.signature(), "%x"));
   printer.key_bool("flash", a.is_flash());
   printer.key_bool("codeExternal", a.is_code_external());
   printer.key_bool("dataExternal", a.is_data_external());
@@ -137,7 +138,6 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
       = reinterpret_cast<appfs_file_t *>(m_create_install_attributes.buffer);
 
     // delete the settings if they exist
-
     var::View(f->hdr.name)
       .fill<u8>(0)
       .truncate(sizeof((f->hdr.name)))
@@ -153,6 +153,8 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
     m_data_size = f->exec.code_size;
 
   } else {
+    m_bytes_written = 0;
+    m_data_size = 0;
     m_request = I_APPFS_INSTALL;
   }
 }
@@ -171,14 +173,13 @@ Appfs &Appfs::append(
 
   size_t bytes_written = 0;
   const size_t file_size = file.size();
-  while (file.read(buffer).return_value() > 0) {
+  while (file.read(View(buffer)).return_value() > 0) {
     bytes_written += return_value();
     append(var::View(buffer).truncate(return_value()));
     if (progress_callback) {
       progress_callback->update(bytes_written, file_size);
     }
   }
-
   if (progress_callback) {
     progress_callback->update(0, 0);
   }
@@ -200,6 +201,11 @@ void Appfs::append(var::View blob) {
       page_size = page_size_available;
     }
 
+    printf(
+      "copy to buffer %d then %d, %d\n",
+      page_offset,
+      bytes_written,
+      page_size);
     memcpy(
       m_create_install_attributes.buffer + page_offset,
       blob.to_const_u8() + bytes_written,
