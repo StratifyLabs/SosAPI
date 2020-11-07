@@ -436,12 +436,9 @@ public:
     File(const File &file) = delete;
     File &operator=(const File &file) = delete;
 
-    File(File &&a) {}
+    File(File &&a) { swap(a); }
     File &operator=(File &&a) {
-      std::swap(m_fd, a.m_fd);
-#if defined __link
-      std::swap(m_driver, a.m_driver);
-#endif
+      swap(a);
       return *this;
     }
 
@@ -484,6 +481,11 @@ public:
     void close();
     int internal_close(int fd) const;
     int internal_open(const char *path, int flags, int mode) const;
+
+    void swap(File &a) {
+      std::swap(m_fd, a.m_fd);
+      std::swap(m_driver, a.m_driver);
+    }
   };
 
   class Dir : public fs::DirAccess<Dir> {
