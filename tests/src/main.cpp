@@ -1,5 +1,6 @@
 ﻿
 
+#include <signal.h>
 #include <sys/Cli.hpp>
 
 #include "UnitTest.hpp"
