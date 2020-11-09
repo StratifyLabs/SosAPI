@@ -64,6 +64,8 @@ printer::operator<<(printer::Printer &printer, const sos::Sys::Info &a) {
     printer.key("projectId", a.id());
     if (a.team_id().is_empty() == false) {
       printer.key("team", a.team_id());
+    } else {
+      printer.key("team", "<none>");
     }
     printer.key("bspVersion", a.bsp_version());
     printer.key("sosVersion", a.sos_version());
