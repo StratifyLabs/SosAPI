@@ -2,6 +2,7 @@
 if(NOT DEFINED IS_SDK)
 include(API)
 if(SOS_IS_LINK)
+	include(StratifyOS)
 	include(CryptoAPI)
 	include(UsbAPI)
 endif()

@@ -10,6 +10,7 @@ include(sos-sdk)
 
 if(NOT DEFINED IS_SDK)
 	if(SOS_IS_LINK)
+		include(StratifyOS)
 		include(UsbAPI)
 	endif()
 	include(CryptoAPI)
