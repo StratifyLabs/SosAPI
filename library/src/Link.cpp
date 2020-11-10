@@ -68,7 +68,7 @@ fs::PathList Link::get_path_list() {
     result.push_back(device_name);
     last_device = device_name;
   }
-  return std::move(result);
+	return result;
 }
 
 var::Vector<Link::Info> Link::get_info_list() {
@@ -872,8 +872,6 @@ const Link::File &Link::File::sync() const {
   if (m_fd >= 0) {
 #if !defined __win32
     API_SYSTEM_CALL("", internal_fsync(m_fd));
-#else
-    ret = 0;
 #endif
   }
   return *this;
