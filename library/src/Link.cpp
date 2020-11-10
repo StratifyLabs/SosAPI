@@ -1168,7 +1168,7 @@ PathList Link::FileSystem::read_directory(
     }
   } while (!is_the_end);
 
-  return std::move(result);
+	return result;
 }
 
 bool Link::FileSystem::directory_exists(var::StringView path) const {
