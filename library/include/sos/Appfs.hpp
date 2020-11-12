@@ -4,11 +4,13 @@
 #ifndef SYSAPI_SYS_APPFS_HPP_
 #define SYSAPI_SYS_APPFS_HPP_
 
-#include "api/api.hpp"
+#include <api/api.hpp>
+#include <fs/File.hpp>
+#include <var/String.hpp>
+
+#include <sos/dev/appfs.h>
 
 #include "Link.hpp"
-#include "fs/File.hpp"
-#include "var/String.hpp"
 
 namespace sos {
 
