@@ -149,13 +149,13 @@ public:
 
     var::StringView name() const { return m_file_header.hdr.name; }
     FileAttributes &set_name(const var::StringView value) {
-      var::View(m_file_header.hdr.name).copy(value);
+      var::View(m_file_header.hdr.name).fill(0).copy(value);
       return *this;
     }
 
     var::StringView id() const { return m_file_header.hdr.id; }
     FileAttributes &set_id(const var::StringView value) {
-      var::View(m_file_header.hdr.id).copy(value);
+      var::View(m_file_header.hdr.id).fill(0).copy(value);
       return *this;
     }
 

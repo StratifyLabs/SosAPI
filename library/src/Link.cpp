@@ -45,7 +45,10 @@ using namespace sos;
 
 Link::Link() { link_load_default_driver(driver()); }
 
-Link::~Link() { disconnect(); }
+Link::~Link() {
+  api::ErrorGuard error_guard;
+  disconnect();
+}
 
 Link &Link::reset_progress() {
   m_progress = 0;
@@ -73,6 +76,8 @@ fs::PathList Link::get_path_list() {
 
 var::Vector<Link::Info> Link::get_info_list() {
   var::Vector<Info> result;
+  API_RETURN_VALUE_IF_ERROR(result);
+
   fs::PathList path_list = get_path_list();
 
   // disconnect if already connected
@@ -236,7 +241,6 @@ Link &Link::write_flash(int addr, const void *buf, int nbyte) {
 }
 
 Link &Link::disconnect() {
-
   if (driver()->phy_driver.handle != LINK_PHY_OPEN_ERROR) {
     link_disconnect(driver());
 
@@ -1024,7 +1028,8 @@ Link::FileSystem::FileSystem(link_transport_mdriver_t *driver) {
   set_driver(driver);
 }
 
-const Link::FileSystem &Link::FileSystem::remove(var::StringView path) const {
+const Link::FileSystem &
+Link::FileSystem::remove(const var::StringView path) const {
   API_RETURN_VALUE_IF_ERROR(*this);
   const var::PathString path_string(path);
   API_SYSTEM_CALL(
@@ -1033,7 +1038,8 @@ const Link::FileSystem &Link::FileSystem::remove(var::StringView path) const {
   return *this;
 }
 
-const Link::FileSystem &Link::FileSystem::touch(var::StringView path) const {
+const Link::FileSystem &
+Link::FileSystem::touch(const var::StringView path) const {
   API_RETURN_VALUE_IF_ERROR(*this);
   char c;
   API_SYSTEM_CALL(
@@ -1056,14 +1062,14 @@ const Link::FileSystem &Link::FileSystem::rename(const Rename &options) const {
   return *this;
 }
 
-bool Link::FileSystem::exists(var::StringView path) const {
+bool Link::FileSystem::exists(const var::StringView path) const {
   API_RETURN_VALUE_IF_ERROR(false);
   bool result = File(path, OpenMode::read_only(), driver()).is_success();
   reset_error();
   return result;
 }
 
-fs::FileInfo Link::FileSystem::get_info(var::StringView path) const {
+fs::FileInfo Link::FileSystem::get_info(const var::StringView path) const {
   API_RETURN_VALUE_IF_ERROR(FileInfo());
   const var::PathString path_string(path);
   struct stat stat = {0};
@@ -1081,7 +1087,7 @@ fs::FileInfo Link::FileSystem::get_info(const File &file) const {
 }
 
 const Link::FileSystem &Link::FileSystem::remove_directory(
-  var::StringView path,
+  const var::StringView path,
   IsRecursive recursive) const {
 
   if (recursive == IsRecursive::yes) {
@@ -1111,7 +1117,7 @@ const Link::FileSystem &Link::FileSystem::remove_directory(
 }
 
 const Link::FileSystem &
-Link::FileSystem::remove_directory(var::StringView path) const {
+Link::FileSystem::remove_directory(const var::StringView path) const {
   API_RETURN_VALUE_IF_ERROR(*this);
   const var::PathString path_string(path);
   API_SYSTEM_CALL(
@@ -1171,14 +1177,15 @@ PathList Link::FileSystem::read_directory(
 	return result;
 }
 
-bool Link::FileSystem::directory_exists(var::StringView path) const {
+bool Link::FileSystem::directory_exists(const var::StringView path) const {
   API_RETURN_VALUE_IF_ERROR(false);
   bool result = Dir(path).is_success();
   reset_error();
   return result;
 }
 
-fs::Permissions Link::FileSystem::get_permissions(var::StringView path) const {
+fs::Permissions
+Link::FileSystem::get_permissions(const var::StringView path) const {
   const var::StringView parent = fs::Path::parent_directory(path);
   if (parent.is_empty()) {
     return get_info(".").permissions();
@@ -1188,7 +1195,7 @@ fs::Permissions Link::FileSystem::get_permissions(var::StringView path) const {
 }
 
 const Link::FileSystem &Link::FileSystem::create_directory(
-  var::StringView path,
+  const var::StringView path,
   const Permissions &permissions) const {
 
   const Permissions use_permissions

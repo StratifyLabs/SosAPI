@@ -231,18 +231,18 @@ void Appfs::append(var::View blob) {
 
 bool Appfs::is_flash_available() {
   API_RETURN_VALUE_IF_ERROR(false);
-  bool result
-    = FILE_BASE::Dir("/app/flash" FSAPI_LINK_MEMBER_DRIVER_LAST).is_success();
+  const char *first_entry
+    = FILE_BASE::Dir("/app/flash" FSAPI_LINK_MEMBER_DRIVER_LAST).read();
   API_RESET_ERROR();
-  return result;
+  return first_entry != nullptr;
 }
 
 bool Appfs::is_ram_available() {
   API_RETURN_VALUE_IF_ERROR(false);
-  bool result
-    = FILE_BASE::Dir("/app/ram" FSAPI_LINK_MEMBER_DRIVER_LAST).is_success();
+  const char *first_entry
+    = FILE_BASE::Dir("/app/ram" FSAPI_LINK_MEMBER_DRIVER_LAST).read();
   API_RESET_ERROR();
-  return result;
+  return first_entry != nullptr;
 }
 
 #if 0

@@ -534,22 +534,22 @@ public:
 
     FileSystem(link_transport_mdriver_t *driver);
 
-    bool exists(var::StringView path) const;
+    bool exists(const var::StringView path) const;
 
-    const FileSystem &remove(var::StringView path) const;
-    const FileSystem &remove_directory(var::StringView path) const;
+    const FileSystem &remove(const var::StringView path) const;
+    const FileSystem &remove_directory(const var::StringView path) const;
 
     const FileSystem &
-    remove_directory(var::StringView path, IsRecursive recursive) const;
+    remove_directory(const var::StringView path, IsRecursive recursive) const;
 
-    bool directory_exists(var::StringView path) const;
+    bool directory_exists(const var::StringView path) const;
 
     const FileSystem &create_directory(
-      var::StringView path,
+      const var::StringView path,
       const fs::Permissions &permissions = fs::Permissions(0)) const;
 
     const FileSystem &create_directory(
-      var::StringView path,
+      const var::StringView path,
       IsRecursive is_recursive,
       const fs::Permissions &permissions = fs::Permissions(0)) const;
 
@@ -568,13 +568,13 @@ public:
       return rename(options);
     }
 
-    const FileSystem &touch(var::StringView path) const;
+    const FileSystem &touch(const var::StringView path) const;
 
-    fs::FileInfo get_info(var::StringView path) const;
+    fs::FileInfo get_info(const var::StringView path) const;
     fs::FileInfo get_info(const File &file) const;
 
   protected:
-    fs::Permissions get_permissions(var::StringView path) const;
+    fs::Permissions get_permissions(const var::StringView path) const;
 
     int interface_mkdir(const char *path, int mode) const;
     int interface_rmdir(const char *path) const;
