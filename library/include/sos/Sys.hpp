@@ -78,7 +78,6 @@ public:
 #if !defined __link
   var::String get_version();
   var::String get_kernel_version();
-  sos_board_config_t get_board_config();
 #endif
 
   Info get_info() const;

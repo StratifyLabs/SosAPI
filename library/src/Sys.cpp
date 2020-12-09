@@ -117,13 +117,3 @@ sys_id_t Sys::get_id() const {
   m_file.ioctl(I_SYS_GETID, &result);
   return result;
 }
-
-#if !defined __link
-
-sos_board_config_t Sys::get_board_config() {
-  sos_board_config_t result;
-  m_file.ioctl(I_SYS_GETBOARDCONFIG, &result);
-  return result;
-}
-
-#endif
