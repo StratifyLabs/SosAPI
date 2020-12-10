@@ -8,7 +8,7 @@
 
 #if defined __link
 
-#include <mcu/types.h>
+#include <sdk/types.h>
 #include <sos/link.h>
 
 #include <api/api.hpp>
@@ -107,8 +107,8 @@ public:
     static var::StringView host_prefix() { return "host@"; }
 
     var::PathString path_description() const {
-      return var::PathString(m_driver ? device_prefix() : host_prefix())
-             & m_path;
+      return (m_driver ? device_prefix() : host_prefix())
+             & m_path.string_view();
     }
 
     bool is_device_path() const { return m_driver != nullptr; }
