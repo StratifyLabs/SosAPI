@@ -1064,8 +1064,9 @@ const Link::FileSystem &Link::FileSystem::rename(const Rename &options) const {
 
 bool Link::FileSystem::exists(const var::StringView path) const {
   API_RETURN_VALUE_IF_ERROR(false);
-  bool result = File(path, OpenMode::read_only(), driver()).is_success();
-  reset_error();
+  get_info(path);
+  bool result = is_success();
+  API_RESET_ERROR();
   return result;
 }
 
@@ -1179,8 +1180,9 @@ PathList Link::FileSystem::read_directory(
 
 bool Link::FileSystem::directory_exists(const var::StringView path) const {
   API_RETURN_VALUE_IF_ERROR(false);
-  bool result = Dir(path).is_success();
-  reset_error();
+  FileInfo info = get_info(path);
+  const bool result = is_success() && info.is_directory();
+  API_RESET_ERROR();
   return result;
 }
 
@@ -1197,6 +1199,12 @@ Link::FileSystem::get_permissions(const var::StringView path) const {
 const Link::FileSystem &Link::FileSystem::create_directory(
   const var::StringView path,
   const Permissions &permissions) const {
+
+  if (directory_exists(path)) {
+    return *this;
+  }
+
+  printf("%s doesn't exists %p\n", path.get_string().cstring(), driver());
 
   const Permissions use_permissions
     = permissions.permissions() == 0 ? get_permissions(path) : permissions;
@@ -1229,7 +1237,7 @@ const Link::FileSystem &Link::FileSystem::create_directory(
   for (u32 i = 0; i < path_tokens.count(); i++) {
     if (path_tokens.at(i).is_empty() == false) {
       base_path += path_tokens.at(i);
-      if (create_directory(base_path.cstring(), permissions).is_error()) {
+      if (create_directory(base_path, permissions).is_error()) {
         return *this;
       }
       base_path += "/";
