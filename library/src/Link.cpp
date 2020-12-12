@@ -216,10 +216,9 @@ Link &Link::reconnect(int retries, chrono::MicroTime delay) {
 
 Link &Link::read_flash(int addr, void *buf, int nbyte) {
   API_RETURN_VALUE_IF_ERROR(*this);
-  int err = -1;
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
-    err = link_readflash(driver(), addr, buf, nbyte);
+    const int err = link_readflash(driver(), addr, buf, nbyte);
     if (err != LINK_PROT_ERROR)
       break;
   }
@@ -229,10 +228,9 @@ Link &Link::read_flash(int addr, void *buf, int nbyte) {
 
 Link &Link::write_flash(int addr, const void *buf, int nbyte) {
   API_RETURN_VALUE_IF_ERROR(*this);
-  int err = -1;
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
-    err = link_writeflash(driver(), addr, buf, nbyte);
+    const int err = link_writeflash(driver(), addr, buf, nbyte);
     if (err != LINK_PROT_ERROR)
       break;
   }
@@ -313,7 +311,6 @@ Link &Link::get_time(struct tm *gt) {
 
 Link &Link::set_time(struct tm *gt) {
   API_RETURN_VALUE_IF_ERROR(*this);
-  int err = -1;
   struct link_tm ltm;
 
   ltm.tm_hour = gt->tm_hour;
@@ -332,7 +329,7 @@ Link &Link::set_time(struct tm *gt) {
   }
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
-    err = link_settime(driver(), &ltm);
+    const int err = link_settime(driver(), &ltm);
     if (err != LINK_PROT_ERROR)
       break;
   }
@@ -449,14 +446,13 @@ Link &Link::run_app(const var::StringView path) {
 
 Link &Link::format(const var::StringView path) {
   API_RETURN_VALUE_IF_ERROR(*this);
-  int err = -1;
   if (is_bootloader()) {
     API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
   }
   // Format the filesystem
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
-    err = link_mkfs(driver(), PathString(path).cstring());
+    const int err = link_mkfs(driver(), PathString(path).cstring());
     if (err != LINK_PROT_ERROR)
       break;
   }
@@ -521,7 +517,6 @@ Link &Link::get_bootloader_attr(bootloader_attr_t &attr) {
 u32 Link::validate_os_image_id_with_connected_bootloader(
   const FileObject *source_image) {
   API_RETURN_VALUE_IF_ERROR(0);
-  int err = -1;
   u32 image_id;
 
   if (is_connected() == false) {
@@ -546,7 +541,6 @@ u32 Link::validate_os_image_id_with_connected_bootloader(
   m_progress_max = static_cast<int>(source_image->size());
 
   if ((image_id & ~0x01) != (m_bootloader_attributes.hardware_id & ~0x01)) {
-    err = -1;
     return 0;
   }
 
@@ -754,11 +748,11 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
 
     // write the start block
     if (
-      (err = link_writeflash(
-         driver(),
-         start_address,
-         start_address_buffer.data(),
-         start_address_buffer.size()))
+      link_writeflash(
+        driver(),
+        start_address,
+        start_address_buffer.data(),
+        start_address_buffer.size())
       != start_address_buffer.size()) {
 
       if (progress_callback) {
@@ -773,11 +767,11 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
       // verify the stack address
       buffer.resize(start_address_buffer.size());
       if (
-        (err = link_readflash(
-           driver(),
-           start_address,
-           buffer.data(),
-           start_address_buffer.size()))
+        link_readflash(
+          driver(),
+          start_address,
+          buffer.data(),
+          start_address_buffer.size())
         != start_address_buffer.size()) {
         if (progress_callback) {
           progress_callback->update(0, 0);
