@@ -71,7 +71,7 @@ fs::PathList Link::get_path_list() {
     result.push_back(device_name);
     last_device = device_name;
   }
-	return result;
+  return result;
 }
 
 var::Vector<Link::Info> Link::get_info_list() {
@@ -562,7 +562,6 @@ Link &Link::erase_os(const UpdateOs &options) {
     = options.printer()->progress_callback();
 
   options.printer()->set_progress_key("erasing");
-
 
   // first erase the flash
   API_SYSTEM_CALL("", link_eraseflash(driver()));
@@ -1155,13 +1154,10 @@ PathList Link::FileSystem::read_directory(
             = read_directory(entry_path, is_recursive, exclude);
 
           for (const auto &intermediate_entry : intermediate_result) {
-            const var::PathString intermediate_path
-              = var::PathString(entry_path) / intermediate_entry;
-
-            result.push_back(intermediate_path);
+            result.push_back(entry / intermediate_entry);
           }
         } else {
-          result.push_back(entry_path);
+          result.push_back(entry);
         }
       } else {
         result.push_back(entry);
@@ -1169,7 +1165,7 @@ PathList Link::FileSystem::read_directory(
     }
   } while (!is_the_end);
 
-	return result;
+  return result;
 }
 
 bool Link::FileSystem::directory_exists(const var::StringView path) const {

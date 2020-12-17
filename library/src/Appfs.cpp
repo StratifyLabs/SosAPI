@@ -101,11 +101,9 @@ Appfs::FileAttributes::FileAttributes(const fs::FileObject &existing) {
 
 const Appfs::FileAttributes &
 Appfs::FileAttributes::apply(const fs::FileObject &file) const {
-  const int location = file.location();
+  fs::File::LocationGuard location_guard(file);
   const size_t size = file.size();
-  file.seek(0)
-    .write(var::View(m_file_header))
-    .seek(location, fs::File::Whence::set);
+  file.seek(0).write(var::View(m_file_header));
 
   API_ASSERT((file.size() == size) || (file.size() == sizeof(m_file_header)));
 
