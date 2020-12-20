@@ -1,6 +1,4 @@
-﻿/*! \file */ // Copyright 2011-2020 Tyler Gilbert and Stratify Labs, Inc; see
-             // LICENSE.md for rights.
-/* Copyright 2016-2018 Tyler Gilbert ALl Rights Reserved */
+﻿// Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
 
 #if defined __link
 
@@ -695,7 +693,7 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
       loc = start_address;
       m_progress = 0;
 
-      options.printer()->progress_key() = "verifying";
+      options.printer()->progress_key() = StringView("verifying");
 
       while ((options.image()->read(buffer).return_value()) > 0) {
         const int bytes_read = options.image()->return_value();
@@ -1193,8 +1191,6 @@ const Link::FileSystem &Link::FileSystem::create_directory(
   if (directory_exists(path)) {
     return *this;
   }
-
-  printf("%s doesn't exists %p\n", path.get_string().cstring(), driver());
 
   const Permissions use_permissions
     = permissions.permissions() == 0 ? get_permissions(path) : permissions;

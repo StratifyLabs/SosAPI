@@ -1,8 +1,7 @@
-/*! \file */ // Copyright 2011-2020 Tyler Gilbert and Stratify Labs, Inc; see
-             // LICENSE.md for rights.
+// Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
 
-#ifndef SYSAPI_SYS_APPFS_HPP_
-#define SYSAPI_SYS_APPFS_HPP_
+#ifndef SOSAPI_APPFS_HPP_
+#define SOSAPI_APPFS_HPP_
 
 #include <api/api.hpp>
 #include <fs/File.hpp>
@@ -268,4 +267,4 @@ Printer &operator<<(Printer &printer, const sos::Appfs::FileAttributes &a);
 Printer &operator<<(Printer &printer, const appfs_file_t &a);
 } // namespace printer
 
-#endif /* SYSAPI_SYS_APPFS_HPP_ */
+#endif /* SOSAPI_APPFS_HPP_ */

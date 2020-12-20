@@ -1,8 +1,7 @@
-/*! \file */ // Copyright 2011-2020 Tyler Gilbert and Stratify Labs, Inc; see
-             // LICENSE.md for rights.
+// Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
 
-#ifndef LINKAPI_LINK_LINK_HPP_
-#define LINKAPI_LINK_LINK_HPP_
+#ifndef SOSAPI_LINK_LINK_HPP_
+#define SOSAPI_LINK_LINK_HPP_
 
 #include "macros.hpp"
 
@@ -622,4 +621,4 @@ Printer &operator<<(Printer &printer, const sos::Link::InfoList &a);
 
 #endif // link
 
-#endif // LINKAPI_LINK_LINK_HPP_
+#endif // SOSAPI_LINK_LINK_HPP_

@@ -1,5 +1,7 @@
-#ifndef SYSAPI_SYS_SOS_HPP
-#define SYSAPI_SYS_SOS_HPP
+// Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
+
+#ifndef SOSAPI_SOS_HPP
+#define SOSAPI_SOS_HPP
 
 #if !defined __link
 
@@ -64,4 +66,4 @@ public:
 } // namespace sys
 
 #endif
-#endif // SYSAPI_SYS_SOS_HPP
+#endif // SOSAPI_SOS_HPP

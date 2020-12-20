@@ -1,7 +1,7 @@
-/*! \file */ // Copyright 2011-2020 Tyler Gilbert and Stratify Labs, Inc; see
-             // LICENSE.md for rights.
-#ifndef AUTH_HPP
-#define AUTH_HPP
+// Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
+
+#ifndef SOSAPI_AUTH_HPP
+#define SOSAPI_AUTH_HPP
 
 #include <sos/dev/auth.h>
 #include <sos/link.h>
@@ -99,4 +99,4 @@ private:
 
 } // namespace sys
 
-#endif // AUTH_HPP
+#endif // SOSAPI_AUTH_HPP
