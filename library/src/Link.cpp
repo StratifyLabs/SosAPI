@@ -1083,11 +1083,11 @@ const Link::FileSystem &Link::FileSystem::remove_directory(
   IsRecursive recursive) const {
 
   if (recursive == IsRecursive::yes) {
-    Dir d(path);
+    Dir d(path, driver());
 
     var::String entry;
     while ((entry = d.read()).is_empty() == false) {
-      var::String entry_path = path + "/" + entry;
+      var::PathString entry_path = path / entry;
       FileInfo info = get_info(entry_path);
       if (info.is_directory()) {
         if (entry != "." && entry != "..") {
@@ -1125,7 +1125,7 @@ PathList Link::FileSystem::read_directory(
   PathList result;
   bool is_the_end = false;
 
-  Link::Dir directory(path, driver());
+  Dir directory(path, driver());
 
   do {
     const char *entry_result = directory.read();

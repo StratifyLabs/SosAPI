@@ -75,7 +75,6 @@ public:
     Path() { m_driver = nullptr; }
 
     Path(const var::StringView path, link_transport_mdriver_t *driver) {
-
       if (path.find(host_prefix()) == 0) {
         m_driver = nullptr;
         m_path = path.get_substring_at_position(host_prefix().length());
@@ -443,6 +442,7 @@ public:
 
     virtual ~File();
 
+    bool is_valid() const { return m_fd >= 0; }
     int fileno() const;
     int flags() const;
     const File &sync() const;
