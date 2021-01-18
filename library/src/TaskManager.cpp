@@ -65,20 +65,22 @@ TaskManager::Info TaskManager::get_info(u32 id) const {
 }
 
 var::Vector<TaskManager::Info> TaskManager::get_info() {
-  int task_count = count_total();
   var::Vector<Info> result;
-  result.reserve(task_count);
+  result.reserve(64);
   int id = 0;
+  api::ErrorGuard error_guard;
   while (is_success()) {
     Info info = get_info(id++);
-    if (info.id() == 0) {
-      info.set_name("idle");
-    }
-    if (info.is_enabled()) {
-      result.push_back(info);
+    if (is_success()) {
+      if (info.id() == 0) {
+        info.set_name("idle");
+      }
+      if (info.is_enabled()) {
+        result.push_back(info);
+      }
     }
   }
-  API_RESET_ERROR();
+
   return result;
 }
 

@@ -60,7 +60,7 @@ fs::PathList Link::get_path_list() {
   PathString last_device;
 
   while (driver()->getname(
-           device_name.to_char(),
+           device_name.data(),
            last_device.cstring(),
            static_cast<int>(device_name.capacity()))
          == 0) {
