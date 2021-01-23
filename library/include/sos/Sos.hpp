@@ -1,7 +1,7 @@
 // Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
 
-#ifndef SOSAPI_SOS_HPP
-#define SOSAPI_SOS_HPP
+#ifndef SOSAPI_SOS_SOS_HPP
+#define SOSAPI_SOS_SOS_HPP
 
 #if !defined __link
 
@@ -36,15 +36,15 @@ public:
       nullptr);
   };
 
-  var::String launch(const Launch &options) const;
+  var::PathString launch(const Launch &options) const;
 
-  var::String install(
+  var::PathString install(
     var::StringView path,
     Appfs::Flags options
     = Appfs::Flags::is_default, // run in RAM, discard on exit
     int ram_size = 0) const;
 
-  var::String install(
+  var::PathString install(
     var::StringView path,
     Appfs::Flags options, // run in RAM, discard on exit
     int ram_size,
@@ -66,4 +66,4 @@ public:
 } // namespace sys
 
 #endif
-#endif // SOSAPI_SOS_HPP
+#endif // SOSAPI_SOS_SOS_HPP

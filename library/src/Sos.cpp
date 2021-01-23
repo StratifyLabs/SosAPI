@@ -1,6 +1,9 @@
 // Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
 
 #if !defined __link
+#include <sos/dev/core.h>
+#include <sos/power.h>
+#include <sos/process.h>
 #include <sos/sos.h>
 
 #include <var/StackString.hpp>
@@ -34,18 +37,17 @@ void Sos::reset() {
   ::close(fd); // incase reset fails
 }
 
-var::String Sos::launch(const Launch &options) const {
-  API_RETURN_VALUE_IF_ERROR(var::String());
-  var::String result;
+var::PathString Sos::launch(const Launch &options) const {
+  API_RETURN_VALUE_IF_ERROR(var::PathString());
+  var::PathString result;
   const var::PathString path_string(options.path());
   const var::GeneralString argument_string(options.arguments());
-  result.resize(PATH_MAX);
   if (
     API_SYSTEM_CALL(
       "",
       ::launch(
         path_string.cstring(),
-        result.to_char(),
+        result.data(),
         argument_string.cstring(),
         static_cast<int>(options.application_flags()),
         options.ram_size(),
@@ -54,40 +56,39 @@ var::String Sos::launch(const Launch &options) const {
         nullptr                                // environment not implemented
         ))
     < 0) {
-    return var::String();
+    return var::PathString();
   }
   return result;
 }
 
-var::String Sos::install(
+var::PathString Sos::install(
   var::StringView path,
   Appfs::Flags options, // run in RAM, discard on exit
   int ram_size) const {
-  API_RETURN_VALUE_IF_ERROR(var::String());
+  API_RETURN_VALUE_IF_ERROR(var::PathString());
   return install(path, options, ram_size, nullptr);
 }
 
-var::String Sos::install(
+var::PathString Sos::install(
   var::StringView path,
   Appfs::Flags options, // run in RAM, discard on exit
   int ram_size,
   const api::ProgressCallback *progress_callback) const {
   const var::PathString path_string(path);
-  var::String result;
-  result.resize(PATH_MAX);
-  API_RETURN_VALUE_IF_ERROR(var::String());
+  var::PathString result;
+  API_RETURN_VALUE_IF_ERROR(var::PathString());
   if (
     API_SYSTEM_CALL(
       "",
       ::install(
         path_string.cstring(),
-        result.to_char(),
+        result.data(),
         static_cast<int>(options),
         ram_size,
         api::ProgressCallback::update_function,
         progress_callback))
     < 0) {
-    return var::String();
+    return var::PathString();
   }
   return result;
 }

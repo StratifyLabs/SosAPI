@@ -3,11 +3,6 @@
 #ifndef SOSAPI_SOS_HPP
 #define SOSAPI_SOS_HPP
 
-/*! \brief System Access (POSIX wrappers)
- * \details The sys namespace includes classes for
- * accessing the system.
- *
- */
 namespace sos {
 }
 
