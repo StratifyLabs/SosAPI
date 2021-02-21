@@ -60,7 +60,7 @@ TaskManager::Info TaskManager::get_info(u32 id) const {
   API_RETURN_VALUE_IF_ERROR(Info());
   sys_taskattr_t attr = {0};
   attr.tid = id;
-  API_SYSTEM_CALL("", m_sys_device.ioctl(I_SYS_GETTASK, &attr).return_value());
+  m_sys_device.ioctl(I_SYS_GETTASK, &attr);
   return Info(attr);
 }
 

@@ -150,6 +150,10 @@ public:
 
   using IsNull = fs::File::IsNull;
 
+  static constexpr const char * device_path(){
+    return "/dev/sys";
+  }
+
   TaskManager() {}
   TaskManager(
     const var::StringView device FSAPI_LINK_DECLARE_DRIVER_NULLPTR_LAST);
