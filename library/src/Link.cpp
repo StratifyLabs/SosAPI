@@ -518,7 +518,7 @@ u32 Link::validate_os_image_id_with_connected_bootloader(
   u32 image_id;
 
   if (is_connected() == false) {
-    API_RETURN_VALUE_ASSIGN_ERROR(0, "", EBADF);
+    API_RETURN_VALUE_ASSIGN_ERROR(0, "not connected", EBADF);
   }
 
   if (!is_bootloader()) {
@@ -539,7 +539,13 @@ u32 Link::validate_os_image_id_with_connected_bootloader(
   m_progress_max = static_cast<int>(source_image->size());
 
   if ((image_id & ~0x01) != (m_bootloader_attributes.hardware_id & ~0x01)) {
-    return 0;
+    API_RETURN_VALUE_ASSIGN_ERROR(
+      0,
+      GeneralString().format(
+        "invalid image id binary:0x%08lx bootloader:0x%08lx",
+        image_id,
+        m_bootloader_attributes.hardware_id),
+      EINVAL);
   }
 
   return image_id;
@@ -800,19 +806,16 @@ Link &Link::update_os(const UpdateOs &options) {
 
   API_RETURN_VALUE_IF_ERROR(*this);
   if (is_connected() == false) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EBADF);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "not connected", EBADF);
   }
 
   if (is_bootloader() == false) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "not bootloader", EINVAL);
   }
 
   u32 image_id
     = validate_os_image_id_with_connected_bootloader(options.image());
-
-  if (image_id == 0) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
-  }
+  API_RETURN_VALUE_IF_ERROR(*this);
 
   const var::KeyString progress_key = options.printer()->progress_key();
 
