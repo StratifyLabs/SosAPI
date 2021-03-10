@@ -422,11 +422,11 @@ Link &Link::run_app(const var::StringView path) {
   API_RETURN_VALUE_IF_ERROR(*this);
   int err = -1;
   if (is_bootloader()) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "bootloader is running", EIO);
   }
 
   if (path.length() >= LINK_PATH_ARG_MAX - 1) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "path length is too long", EINVAL);
   }
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
@@ -436,7 +436,7 @@ Link &Link::run_app(const var::StringView path) {
   }
 
   if (err < 0) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", link_errno);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "failed to execute", link_errno);
   }
 
   return *this;
@@ -445,7 +445,7 @@ Link &Link::run_app(const var::StringView path) {
 Link &Link::format(const var::StringView path) {
   API_RETURN_VALUE_IF_ERROR(*this);
   if (is_bootloader()) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "bootloader is running", EIO);
   }
   // Format the filesystem
 
@@ -462,7 +462,7 @@ Link &Link::reset() {
   API_RETURN_VALUE_IF_ERROR(*this);
 
   if (is_connected() == false) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EBADF);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "not connected", EBADF);
   }
 
   // this will always result in an error (even on success)
@@ -478,7 +478,7 @@ Link &Link::reset_bootloader() {
   API_RETURN_VALUE_IF_ERROR(*this);
 
   if (is_connected() == false) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EBADF);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "not connected", EBADF);
   }
 
   link_resetbootloader(driver());
@@ -491,12 +491,12 @@ Link &Link::get_bootloader_attr(bootloader_attr_t &attr) {
   API_RETURN_VALUE_IF_ERROR(*this);
 
   if (is_connected() == false) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EBADF);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "not connected", EBADF);
   }
 
   int err = -1;
   if (!is_bootloader()) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "bootloader is running", EIO);
   }
 
   if (is_legacy()) {
@@ -506,7 +506,7 @@ Link &Link::get_bootloader_attr(bootloader_attr_t &attr) {
   }
 
   if (err < 0) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "failed to get bootloader attributes", EIO);
   }
 
   return *this;

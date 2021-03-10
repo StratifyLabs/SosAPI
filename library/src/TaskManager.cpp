@@ -35,10 +35,10 @@ TaskManager::TaskManager(
 
 int TaskManager::count_total() {
   int count = 0;
+  api::ErrorGuard error_guard;
   while (is_success()) {
     get_info(count++);
   }
-  API_RESET_ERROR();
   return count;
 }
 
@@ -46,13 +46,13 @@ int TaskManager::count_free() {
   Info info;
   int count = 0;
   int total_count = 0;
+  api::ErrorGuard error_guard;
   while (is_success()) {
     info = get_info(total_count++);
     if (!info.is_enabled()) {
       count++;
     }
   }
-  API_RESET_ERROR();
   return count;
 }
 
@@ -87,19 +87,20 @@ var::Vector<TaskManager::Info> TaskManager::get_info() {
 bool TaskManager::is_pid_running(pid_t pid) {
   Info info;
   int id = 0;
+  api::ErrorGuard error_guard;
   while (is_success()) {
     info = get_info(id++);
     if ((static_cast<u32>(pid) == info.pid()) && info.is_enabled()) {
       return true;
     }
   }
-  API_RESET_ERROR();
   return false;
 }
 
 int TaskManager::get_pid(const var::StringView name) {
   Info info;
   int id = 0;
+  api::ErrorGuard error_guard;
   while (is_success()) {
     info = get_info(id++);
     if (name == info.name() && info.is_enabled()) {
