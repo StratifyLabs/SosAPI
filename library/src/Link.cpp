@@ -69,6 +69,7 @@ fs::PathList Link::get_path_list() {
     result.push_back(device_name);
     last_device = device_name;
   }
+
   return result;
 }
 
@@ -76,7 +77,7 @@ var::Vector<Link::Info> Link::get_info_list() {
   var::Vector<Info> result;
   API_RETURN_VALUE_IF_ERROR(result);
 
-  fs::PathList path_list = get_path_list();
+  const auto path_list = get_path_list();
 
   // disconnect if already connected
   disconnect();
@@ -189,7 +190,7 @@ Link &Link::reconnect(int retries, chrono::MicroTime delay) {
       API_RESET_ERROR();
     }
 
-    fs::PathList port_list = get_path_list();
+    const auto port_list = get_path_list();
     for (u32 j = 0; j < port_list.count(); j++) {
       connect(port_list.at(j));
 
@@ -506,7 +507,10 @@ Link &Link::get_bootloader_attr(bootloader_attr_t &attr) {
   }
 
   if (err < 0) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "failed to get bootloader attributes", EIO);
+    API_RETURN_VALUE_ASSIGN_ERROR(
+      *this,
+      "failed to get bootloader attributes",
+      EIO);
   }
 
   return *this;
@@ -1124,7 +1128,8 @@ Link::FileSystem::remove_directory(const var::StringView path) const {
 PathList Link::FileSystem::read_directory(
   const var::StringView path,
   IsRecursive is_recursive,
-  bool (*exclude)(var::StringView entry)) const {
+  bool (*exclude)(var::StringView entry, void *context),
+  void *context) const {
   PathList result;
   bool is_the_end = false;
 
@@ -1141,7 +1146,7 @@ PathList Link::FileSystem::read_directory(
     }
 
     if (
-      (exclude == nullptr || !exclude(entry.string_view())) && !entry.is_empty()
+      (exclude == nullptr || !exclude(entry.string_view(), context)) && !entry.is_empty()
       && (entry.string_view() != ".") && (entry.string_view() != "..")) {
 
       if (is_recursive == IsRecursive::yes) {

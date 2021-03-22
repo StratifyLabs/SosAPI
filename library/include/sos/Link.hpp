@@ -555,7 +555,8 @@ public:
     fs::PathList read_directory(
       const var::StringView path,
       IsRecursive is_recursive = IsRecursive::no,
-      bool (*exclude)(var::StringView) = nullptr) const;
+      bool (*exclude)(var::StringView, void * context) = nullptr,
+      void * context = nullptr) const;
 
     class Rename {
       API_AC(Rename, var::StringView, source);
