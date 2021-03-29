@@ -1157,7 +1157,7 @@ PathList Link::FileSystem::read_directory(
 
         if (info.is_directory()) {
           PathList intermediate_result
-            = read_directory(entry_path, is_recursive, exclude);
+            = read_directory(entry_path, is_recursive, exclude, context);
 
           for (const auto &intermediate_entry : intermediate_result) {
             result.push_back(entry / intermediate_entry);
