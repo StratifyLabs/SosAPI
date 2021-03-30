@@ -296,7 +296,7 @@ return 0;
 #endif
 
 Appfs::Info Appfs::get_info(const var::StringView path) {
-
+  API_RETURN_VALUE_IF_ERROR(Info());
   appfs_file_t appfs_file_header;
   int result = FILE_BASE::File(
                  path,
@@ -304,12 +304,10 @@ Appfs::Info Appfs::get_info(const var::StringView path) {
                  .read(var::View(appfs_file_header))
                  .return_value();
 
-  if (is_error()) {
-    return Info();
-  }
+  API_RETURN_VALUE_IF_ERROR(Info());
 
   if (result < sizeof(appfs_file_header)) {
-    API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", ENOEXEC);
+    API_RETURN_VALUE_ASSIGN_ERROR(Info(), "get info", ENOEXEC);
   }
 
   // first check to see if the name matches -- otherwise it isn't an app
@@ -317,11 +315,11 @@ Appfs::Info Appfs::get_info(const var::StringView path) {
   const var::StringView path_name = fs::Path::name(path);
 
   if (path_name.find(".sys") == 0) {
-    API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", EINVAL);
+    API_RETURN_VALUE_ASSIGN_ERROR(Info(), "is .sys", EINVAL);
   }
 
   if (path_name.find(".free") == 0) {
-    API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", EINVAL);
+    API_RETURN_VALUE_ASSIGN_ERROR(Info(), "is .free", EINVAL);
   }
 
   if ((appfs_file_header.hdr.mode & 0111) == 0) {
@@ -345,7 +343,7 @@ Appfs::Info Appfs::get_info(const var::StringView path) {
     info.o_flags = appfs_file_header.exec.o_flags;
     info.signature = appfs_file_header.exec.signature;
   } else {
-    API_RETURN_VALUE_ASSIGN_ERROR(Info(), "", ENOEXEC);
+    API_RETURN_VALUE_ASSIGN_ERROR(Info(), "no app name", ENOEXEC);
   }
 
   return Info(info);
