@@ -37,7 +37,7 @@ printer::operator<<(printer::Printer &printer, const sos::TraceEvent &a) {
   }
   printer.key(
     "timestamp",
-    var::String().format(
+    var::NumberString().format(
       F32U ".%06ld",
       clock_time.seconds(),
       clock_time.nanoseconds() / 1000UL));
