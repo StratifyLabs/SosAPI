@@ -35,7 +35,7 @@ TaskManager::TaskManager(
 
 int TaskManager::count_total() {
   int count = 0;
-  api::ErrorGuard error_guard;
+  api::ErrorScope error_scope;
   while (is_success()) {
     get_info(count++);
   }
@@ -46,7 +46,7 @@ int TaskManager::count_free() {
   Info info;
   int count = 0;
   int total_count = 0;
-  api::ErrorGuard error_guard;
+  api::ErrorScope error_scope;
   while (is_success()) {
     info = get_info(total_count++);
     if (!info.is_enabled()) {
@@ -68,7 +68,7 @@ var::Vector<TaskManager::Info> TaskManager::get_info() {
   var::Vector<Info> result;
   result.reserve(64);
   int id = 0;
-  api::ErrorGuard error_guard;
+  api::ErrorScope error_scope;
   while (is_success()) {
     Info info = get_info(id++);
     if (is_success()) {
@@ -87,7 +87,7 @@ var::Vector<TaskManager::Info> TaskManager::get_info() {
 bool TaskManager::is_pid_running(pid_t pid) {
   Info info;
   int id = 0;
-  api::ErrorGuard error_guard;
+  api::ErrorScope error_scope;
   while (is_success()) {
     info = get_info(id++);
     if ((static_cast<u32>(pid) == info.pid()) && info.is_enabled()) {
@@ -100,7 +100,7 @@ bool TaskManager::is_pid_running(pid_t pid) {
 int TaskManager::get_pid(const var::StringView name) {
   Info info;
   int id = 0;
-  api::ErrorGuard error_guard;
+  api::ErrorScope error_scope;
   while (is_success()) {
     info = get_info(id++);
     if (name == info.name() && info.is_enabled()) {
