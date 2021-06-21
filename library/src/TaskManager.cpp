@@ -58,7 +58,7 @@ int TaskManager::count_free() {
 
 TaskManager::Info TaskManager::get_info(u32 id) const {
   API_RETURN_VALUE_IF_ERROR(Info());
-  sys_taskattr_t attr = {0};
+  sys_taskattr_t attr{};
   attr.tid = id;
   m_sys_device.ioctl(I_SYS_GETTASK, &attr);
   return Info(attr);
