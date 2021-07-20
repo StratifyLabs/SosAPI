@@ -81,7 +81,6 @@ public:
 
   Info get_info() const;
   bool is_authenticated() const;
-  sys_secret_key_t get_secret_key() const;
   SerialNumber get_serial_number() const;
   sys_id_t get_id() const;
 

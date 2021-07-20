@@ -8,6 +8,7 @@
 
 #if !defined __link
 #include <sos/sos.h>
+#include <trace.h>
 #endif
 
 #include "chrono/ClockTime.hpp"
@@ -113,7 +114,7 @@ public:
    *
    */
   inline void trace_fatal() MCU_ALWAYS_INLINE {
-    sos_trace_event(POSIX_TRACE_FATAL, cstring(), length());
+    sos_trace_event(LINK_POSIX_TRACE_FATAL, cstring(), length());
   }
 #else
   Trace &operator=(const char *a) {

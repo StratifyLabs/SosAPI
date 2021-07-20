@@ -100,11 +100,6 @@ bool Sys::is_authenticated() const {
   return m_file.ioctl(I_SYS_ISAUTHENTICATED, nullptr).return_value();
 }
 
-sys_secret_key_t Sys::get_secret_key() const {
-  sys_secret_key_t result = {0};
-  m_file.ioctl(I_SYS_GETSECRETKEY, &result);
-  return result;
-}
 
 SerialNumber Sys::get_serial_number() const {
   return get_info().serial_number();
