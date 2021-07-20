@@ -5,6 +5,7 @@
 
 #include <crypto/Random.hpp>
 #include <crypto/Sha256.hpp>
+#include <fs/ViewFile.hpp>
 
 #include "sos/Auth.hpp"
 
@@ -40,36 +41,39 @@ Auth::Auth(const var::StringView path FSAPI_LINK_DECLARE_DRIVER_LAST)
 
 bool Auth::authenticate(var::View key) {
   crypto::Random random;
-  crypto::Sha256 hash;
 
-  var::Data random_data(Token::size());
+
+  var::Array<u8, Token::size()> random_data;
   random.randomize(random_data);
 
-  Token token = start(Token(random_data));
+  auto token_key = Token(key);
+  auto token_out = Token(random_data);
 
-  auth_key_token_t key_token;
-  auth_key_token_t reverse_key_token;
+  auto random_token = start(token_out);
 
-  key_token.key = Token(key).auth_token();
-  key_token.token = token.auth_token();
-  reverse_key_token.key = key_token.token;
-  reverse_key_token.token = key_token.key;
+  if( var::View(random_token.auth_token()).truncate(16) != var::View(random_data).truncate(16) ){
+    //first 16 bytes should stay the same
+    return false;
+  }
+
+  const auth_key_token_t hash_out_input = {
+    .key = token_key.auth_token(),
+    .token = random_token.auth_token()};
+
+  const auth_key_token_t hash_in_input = {
+    .key = random_token.auth_token(),
+    .token = token_key.auth_token()};
+
+  const auto hash_out = Token(
+    crypto::Sha256::get_hash(fs::ViewFile(var::View(hash_out_input))));
 
   // do SHA256 calcs
-  Token validation_token
-    = finish(Token(crypto::Sha256().update(var::View(key_token)).output()));
+  const auto hash_in = finish(hash_out);
 
-  // hash.start();
-  // hash << var::View(reverse_key_token);
-  // hash.finish();
+  const auto hash_in_expected = Token(
+    crypto::Sha256::get_hash(fs::ViewFile(var::View(hash_in_input))));
 
-  const crypto::Sha256::Hash reverse_key_token_hash
-    = crypto::Sha256().update(var::View(reverse_key_token)).output();
-
-  // hash output should match validation token
-  if (
-    var::View(reverse_key_token_hash)
-    == var::View(validation_token.auth_token().data)) {
+  if( hash_in == hash_in_expected ){
     return true;
   }
 

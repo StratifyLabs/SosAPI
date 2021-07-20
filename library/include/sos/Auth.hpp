@@ -62,7 +62,7 @@ public:
 
     const auth_token_t &auth_token() const { return m_auth_token; }
 
-    static u32 size() { return sizeof(auth_token_t); }
+    static constexpr u32 size() { return sizeof(auth_token_t); }
 
   private:
     void populate(var::View data);
