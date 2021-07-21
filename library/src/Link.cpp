@@ -12,6 +12,8 @@
 
 #include <chrono.hpp>
 #include <fs/File.hpp>
+#include <fs/DataFile.hpp>
+#include <fs/ViewFile.hpp>
 #include <fs/Path.hpp>
 #include <var.hpp>
 
@@ -178,7 +180,7 @@ Link &Link::connect(var::StringView path, IsLegacy is_legacy) {
 Link &Link::reconnect(int retries, chrono::MicroTime delay) {
   API_RETURN_VALUE_IF_ERROR(*this);
   Info last_info(info());
-  for (u32 i = 0; i < retries; i++) {
+  for (int i = 0; i < retries; i++) {
     connect(last_info.path());
 
     if (is_success()) {
@@ -581,8 +583,8 @@ Link &Link::erase_os(const UpdateOs &options) {
       api::ProgressCallback::indeterminate_progress_total());
   }
 
-  bootloader_attr_t attr = {0};
-  int retry = 0;
+  bootloader_attr_t attr = {};
+  u32 retry = 0;
   bool is_waiting = true;
   do {
     API_RESET_ERROR();
@@ -619,6 +621,30 @@ Link &Link::erase_os(const UpdateOs &options) {
   return *this;
 }
 
+bool Link::is_signature_required() {
+  if( is_bootloader() ){
+    bootloader_attr_t attr;
+    get_bootloader_attr(attr);
+    return link_is_signature_required(driver(), &attr);
+  }
+  return false;
+}
+
+
+var::Array<u8, 64> Link::get_public_key(){
+  var::Array<u8, 64> result;
+  result.fill(0);
+
+  if( is_bootloader() ){
+    bootloader_attr_t attr;
+    get_bootloader_attr(attr);
+    link_get_public_key(driver(), &attr, result.data(), result.count());
+  }
+
+  return result;
+}
+
+
 Link &Link::install_os(u32 image_id, const UpdateOs &options) {
   API_RETURN_VALUE_IF_ERROR(*this);
 
@@ -637,13 +663,17 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
   const api::ProgressCallback *progress_callback
     = options.printer()->progress_callback();
 
-  var::Data start_address_buffer(256);
+  var::Array<u8, 256> start_address_buffer;
+  // var::Data start_address_buffer(256);
   var::Data buffer(buffer_size);
   var::Data compare_buffer(buffer_size);
+
 
   if (options.image()->seek(0).is_error()) {
     API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
   }
+
+  fs::DataFile image_file = fs::DataFile().write(*options.image()).move();
 
   u32 start_address = m_bootloader_attributes.startaddr;
   u32 loc = start_address;
@@ -658,17 +688,38 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
 
   bootloader_attr_t attr;
   get_bootloader_attr(attr);
+  const int is_signature_required = link_is_signature_required(driver(), &attr);
+
+  fs::ViewFile image = fs::ViewFile(image_file.data()).move();
+
+  bootloader_signature_t signature = {};
+  crypt_api_signature512_marker_t signature_marker;
+  if (is_signature_required) {
+    // the signature is the last 64 bytes of the OS image
+    // the signature is NOT written to the device
+    const auto signature_location = image.size() - sizeof(crypt_api_signature512_marker_t);
+    image.seek(signature_location)
+      .read(var::View(signature_marker))
+      .seek(0);
+
+    memcpy(signature.data, signature_marker.signature, 64);
+
+    image = fs::ViewFile(var::View(image_file.data()).truncate(signature_location)).move();
+  }
 
   API_RETURN_VALUE_IF_ERROR(*this);
 
-  while (options.image()->read(buffer).return_value() > 0) {
-    const int bytes_read = options.image()->return_value();
-    if (loc == start_address) {
+  while (image.read(buffer).return_value() > 0) {
+    const int bytes_read = image.return_value();
+
+    // Version 0x400 and beyond will cache the first page
+    // so the sending side does not need to
+    if ((attr.version < 0x400) && (loc == start_address)) {
       // we want to write the first 256 bytes last because the bootloader checks
       // this for a valid image
       var::View buffer_view
-        = var::View(buffer).truncate(start_address_buffer.size());
-      start_address_buffer.copy(buffer_view);
+        = var::View(buffer).truncate(start_address_buffer.count());
+      var::View(start_address_buffer).copy(buffer_view);
 
       // memcpy(stackaddr, buffer, 256);
 
@@ -697,7 +748,18 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
 
   if (err == 0) {
 
-    if (options.is_verify()) {
+    if( attr.version >= 0x400 ){
+      //this is called even if the signature
+      //does not require verification
+      //this triggers the target to install
+      //the first flash page
+      link_verify_signature(driver(), &attr, &signature);
+    }
+
+    //the signature implicitly verifies the code
+    //AND bootloaders that require a signature
+    //do not allow reading back code
+    if (options.is_verify() && !is_signature_required) {
 
       options.image()->seek(0);
       loc = start_address;
@@ -721,7 +783,7 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
 
           if (loc == start_address) {
             var::View(buffer)
-              .truncate(start_address_buffer.size())
+              .truncate(start_address_buffer.count())
               .fill<u8>(0xff);
           }
 
@@ -739,7 +801,6 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
             && (progress_callback->update(m_progress, m_progress_max) == true)) {
             break;
           }
-          err = 0;
         }
       }
     }
@@ -747,10 +808,10 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
     if (image_id != m_bootloader_attributes.hardware_id) {
       // if the LSb of the image_id doesn't match the bootloader HW ID, this
       // will correct it
-      memcpy(
-        start_address_buffer.data_u8() + BOOTLOADER_HARDWARE_ID_OFFSET,
-        &m_bootloader_attributes.hardware_id,
-        sizeof(u32));
+
+      var::View(start_address_buffer)
+        .pop_front(BOOTLOADER_HARDWARE_ID_OFFSET)
+        .copy(var::View(m_bootloader_attributes.hardware_id));
     }
 
     // write the start block
@@ -759,8 +820,8 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
         driver(),
         start_address,
         start_address_buffer.data(),
-        start_address_buffer.size())
-      != start_address_buffer.size()) {
+        start_address_buffer.count())
+      != (int)start_address_buffer.count()) {
 
       if (progress_callback) {
         progress_callback->update(0, 0);
@@ -772,14 +833,14 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
 
     if (options.is_verify()) {
       // verify the stack address
-      buffer.resize(start_address_buffer.size());
+      buffer.resize(start_address_buffer.count());
       if (
         link_readflash(
           driver(),
           start_address,
           buffer.data(),
-          start_address_buffer.size())
-        != start_address_buffer.size()) {
+          start_address_buffer.count())
+        != (int)start_address_buffer.count()) {
         if (progress_callback) {
           progress_callback->update(0, 0);
         }
@@ -926,6 +987,7 @@ int Link::File::internal_close(int fd) const {
 
 int Link::File::internal_fsync(int fd) const {
 #if defined __link
+  MCU_UNUSED_ARGUMENT(fd);
   return 0;
 #else
   return ::fsync(fd);
@@ -988,7 +1050,7 @@ Link::Dir &Link::Dir::open(var::StringView path) {
 Link::Dir &Link::Dir::close() {
   API_RETURN_VALUE_IF_ERROR(*this);
   if (m_dirp) {
-    API_SYSTEM_CALL(m_path.cstring(), interface_closedir());
+    API_SYSTEM_CALL(m_path.cstring(), link_closedir(driver(), m_dirp));
     m_dirp = nullptr;
   }
 
@@ -1006,9 +1068,6 @@ int Link::Dir::interface_readdir_r(
   return link_readdir_r(driver(), m_dirp, result, resultp);
 }
 
-int Link::Dir::interface_closedir() const {
-  return link_closedir(driver(), m_dirp);
-}
 
 int Link::Dir::interface_telldir() const {
   return link_telldir(driver(), m_dirp);
@@ -1071,7 +1130,7 @@ bool Link::FileSystem::exists(const var::StringView path) const {
 fs::FileInfo Link::FileSystem::get_info(const var::StringView path) const {
   API_RETURN_VALUE_IF_ERROR(FileInfo());
   const var::PathString path_string(path);
-  struct stat stat = {0};
+  struct stat stat = {};
   API_SYSTEM_CALL(
     path_string.cstring(),
     interface_stat(path_string.cstring(), &stat));
@@ -1080,7 +1139,7 @@ fs::FileInfo Link::FileSystem::get_info(const var::StringView path) const {
 
 fs::FileInfo Link::FileSystem::get_info(const File &file) const {
   API_RETURN_VALUE_IF_ERROR(FileInfo());
-  struct stat stat = {0};
+  struct stat stat = {};
   API_SYSTEM_CALL("", interface_fstat(file.fileno(), &stat));
   return FileInfo(stat);
 }
@@ -1146,8 +1205,9 @@ PathList Link::FileSystem::read_directory(
     }
 
     if (
-      (exclude == nullptr || !exclude(entry.string_view(), context)) && !entry.is_empty()
-      && (entry.string_view() != ".") && (entry.string_view() != "..")) {
+      (exclude == nullptr || !exclude(entry.string_view(), context))
+      && !entry.is_empty() && (entry.string_view() != ".")
+      && (entry.string_view() != "..")) {
 
       if (is_recursive == IsRecursive::yes) {
 

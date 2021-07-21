@@ -364,10 +364,13 @@ public:
   Link &reset_bootloader();
   Link &get_bootloader_attr(bootloader_attr_t &attr);
   bool is_bootloader() const { return m_is_bootloader == IsBootloader::yes; }
+  bool is_signature_required();
   bool is_connected_and_is_not_bootloader() const {
     return is_connected() && !is_bootloader();
   }
 
+
+  var::Array<u8, 64> get_public_key();
 
   Link &write_flash(int addr, const void *buf, int nbyte);
   Link &read_flash(int addr, void *buf, int nbyte);
@@ -511,7 +514,6 @@ public:
 
     int interface_readdir_r(dirent *result, dirent **resultp) const override;
 
-    int interface_closedir() const override;
     int interface_telldir() const override;
     void interface_seekdir(size_t location) const override;
     void interface_rewinddir() const override;
@@ -521,7 +523,7 @@ public:
     API_AF(Dir, link_transport_mdriver_t *, driver, nullptr);
 
     DIR *m_dirp = nullptr;
-    mutable struct dirent m_entry = {0};
+    mutable struct dirent m_entry = {};
 
     DIR *interface_opendir(const char *path) const;
   };
