@@ -809,9 +809,10 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
       // if the LSb of the image_id doesn't match the bootloader HW ID, this
       // will correct it
 
+      u32 hardward_id = m_bootloader_attributes.hardware_id;
       var::View(start_address_buffer)
         .pop_front(BOOTLOADER_HARDWARE_ID_OFFSET)
-        .copy(var::View(m_bootloader_attributes.hardware_id));
+        .copy(var::View(hardward_id));
     }
 
     // write the start block
