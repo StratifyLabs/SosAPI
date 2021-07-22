@@ -6,10 +6,12 @@
 #include <sos/dev/auth.h>
 #include <sos/link.h>
 
+#include <fs/File.hpp>
+#include <var/String.hpp>
+#include <crypto/Ecc.hpp>
+
 #include "Link.hpp"
 
-#include "fs/File.hpp"
-#include "var/String.hpp"
 
 namespace sos {
 
@@ -85,6 +87,8 @@ public:
 
   Token start(const Token &token);
   Token finish(const Token &token);
+
+  crypto::Dsa::Key get_public_key() const;
 
   bool is_valid() const { return is_success(); }
 

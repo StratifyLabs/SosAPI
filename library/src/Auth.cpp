@@ -42,7 +42,6 @@ Auth::Auth(const var::StringView path FSAPI_LINK_DECLARE_DRIVER_LAST)
 bool Auth::authenticate(var::View key) {
   crypto::Random random;
 
-
   var::Array<u8, Token::size()> random_data;
   random.randomize(random_data);
 
@@ -78,6 +77,12 @@ bool Auth::authenticate(var::View key) {
   }
 
   return false;
+}
+
+crypto::Dsa::Key Auth::get_public_key() const {
+  auth_public_key_t key;
+  m_file.ioctl(I_AUTH_GET_PUBLIC_KEY, &key);
+  return crypto::Dsa::Key(var::View(key));
 }
 
 Auth::Token Auth::start(const Token &token) {
