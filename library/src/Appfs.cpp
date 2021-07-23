@@ -168,9 +168,9 @@ Appfs &Appfs::append(
 
   if (m_data_size == 0 && m_request == I_APPFS_INSTALL) {
     if (is_signature_required) {
-      m_data_size = file.size();
-    } else {
       m_data_size = file.size() - sizeof(crypt_api_signature512_marker_t);
+    } else {
+      m_data_size = file.size();
     }
   }
 
@@ -181,9 +181,13 @@ Appfs &Appfs::append(
 
   size_t bytes_written = 0;
   const size_t file_size = file.size();
-  while (file.read(buffer_view).return_value() > 0) {
-    bytes_written += return_value();
-    append(var::View(buffer).truncate(return_value()));
+  while (file.read(buffer_view).return_value() > 0 && bytes_written < m_data_size) {
+    const auto next = bytes_written + return_value();
+    const auto page_size = next > m_data_size
+                             ? m_data_size - bytes_written
+                             : return_value();
+    bytes_written += page_size;
+    append(var::View(buffer).truncate(page_size));
     if (progress_callback) {
       progress_callback->update(bytes_written, file_size);
     }
@@ -223,6 +227,7 @@ void Appfs::append(var::View blob) {
 
     m_bytes_written += page_size;
     bytes_written += page_size;
+
     if (
       ((m_bytes_written % APPFS_PAGE_SIZE) == 0) // at page boundary
       || (m_bytes_written == m_data_size)) {     // or to the end
@@ -256,60 +261,6 @@ bool Appfs::is_ram_available() {
   return first_entry != nullptr;
 }
 
-#if 0
-//now copy some bytes
-m_create_attributes.nbyte = APPFS_PAGE_SIZE - sizeof(f);
-if( source.size() < (u32)attr.nbyte ){
-	attr.nbyte = source.size();
-}
-
-source.read(
-		attr.buffer + sizeof(f),
-		fs::File::Size(attr.nbyte)
-		);
-
-attr.nbyte += sizeof(f);
-loc = 0;
-bw = 0;
-do {
-if( loc != 0 ){ //when loc is 0 -- header is copied in
-	if( (f.exec.code_size - bw) > APPFS_PAGE_SIZE ){
-		attr.nbyte = APPFS_PAGE_SIZE;
-	} else {
-		attr.nbyte = f.exec.code_size - bw;
-	}
-	source.read(
-				attr.buffer,
-				fs::File::Size(attr.nbyte)
-				);
-}
-
-//location gets modified by the driver so it needs to be fixed on each loop
-attr.loc = loc;
-
-if( (tmp = file.ioctl(
-			fs::File::IoRequest(I_APPFS_CREATE),
-			fs::File::IoArgument(&attr)
-			)) < 0 ){
-	return tmp;
-}
-
-bw += attr.nbyte;
-loc += attr.nbyte;
-
-if( progress_callback ){
-	progress_callback->update(bw, f.exec.code_size);
-}
-
-} while( bw < f.exec.code_size);
-if( progress_callback ){ progress_callback->update(0,0); }
-
-return f.exec.code_size;
-
-return 0;
-}
-#endif
-
 var::Vector<Appfs::PublicKey> Appfs::get_public_key_list() const {
   var::Vector<Appfs::PublicKey> result;
   result.reserve(16);
@@ -318,24 +269,25 @@ var::Vector<Appfs::PublicKey> Appfs::get_public_key_list() const {
 
   int get_key_result;
   u32 key_index = 0;
-  do{
-    appfs_public_key_t public_key = { .index = key_index };
-    get_key_result = m_file.ioctl(I_APPFS_GET_PUBLIC_KEY, &public_key).return_value();
-    //ensure zero terminated id
+  do {
+    appfs_public_key_t public_key = {.index = key_index};
+    get_key_result
+      = m_file.ioctl(I_APPFS_GET_PUBLIC_KEY, &public_key).return_value();
+    // ensure zero terminated id
     public_key.id[sizeof(public_key.id) - 1] = 0;
 
-    if( get_key_result == 0 ){
+    if (get_key_result == 0) {
       result.push_back(PublicKey(public_key));
     }
     key_index++;
-  } while( get_key_result == 0 && key_index < 256);
+  } while (get_key_result == 0 && key_index < 256);
 
   return result;
 }
 
 Appfs::Info Appfs::get_info(const var::StringView path) {
   API_RETURN_VALUE_IF_ERROR(Info());
-  appfs_file_t appfs_file_header;
+  appfs_file_t appfs_file_header = {};
   int result = FILE_BASE::File(
                  path,
                  fs::OpenMode::read_only() FSAPI_LINK_MEMBER_DRIVER_LAST)
@@ -344,9 +296,11 @@ Appfs::Info Appfs::get_info(const var::StringView path) {
 
   API_RETURN_VALUE_IF_ERROR(Info());
 
-  if (result < sizeof(appfs_file_header)) {
+  if (result < static_cast<int>(sizeof(appfs_file_header))) {
     API_RETURN_VALUE_ASSIGN_ERROR(Info(), "get info", ENOEXEC);
   }
+
+  appfs_file_header.hdr.name[APPFS_NAME_MAX] = 0;
 
   // first check to see if the name matches -- otherwise it isn't an app
   // file
