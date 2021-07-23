@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <crypto/Ecc.hpp>
 #include <fs.hpp>
 #include <printer/Printer.hpp>
 #include <var.hpp>
@@ -121,8 +122,7 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
 
   FSAPI_LINK_SET_DRIVER((*this), link_driver);
 
-  const var::PathString path
-    = var::PathString(options.mount()) / "flash" / options.name();
+  const auto path = options.mount() / "flash" / options.name();
 
   if (FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER).exists(path)) {
     FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER).remove(path.string_view());
@@ -162,8 +162,16 @@ Appfs &Appfs::append(
   const fs::FileObject &file,
   const api::ProgressCallback *progress_callback) {
 
+  const auto signature = crypto::Dsa::get_signature(file);
+  const auto is_signature_required
+    = m_file.ioctl(I_APPFS_IS_SIGNATURE_REQUIRED, nullptr).return_value() == 1;
+
   if (m_data_size == 0 && m_request == I_APPFS_INSTALL) {
-    m_data_size = file.size();
+    if (is_signature_required) {
+      m_data_size = file.size();
+    } else {
+      m_data_size = file.size() - sizeof(crypt_api_signature512_marker_t);
+    }
   }
 
   var::Array<char, APPFS_PAGE_SIZE> buffer;
@@ -180,6 +188,13 @@ Appfs &Appfs::append(
       progress_callback->update(bytes_written, file_size);
     }
   }
+
+  if (is_signature_required) {
+    appfs_verify_signature_t verify_signature;
+    View(verify_signature.data).copy(signature.data());
+    m_file.ioctl(I_APPFS_VERIFY_SIGNATURE, &verify_signature);
+  }
+
   if (progress_callback) {
     progress_callback->update(0, 0);
   }
@@ -295,6 +310,29 @@ return 0;
 }
 #endif
 
+var::Vector<Appfs::PublicKey> Appfs::get_public_key_list() const {
+  var::Vector<Appfs::PublicKey> result;
+  result.reserve(16);
+
+  api::ErrorScope es;
+
+  int get_key_result;
+  u32 key_index = 0;
+  do{
+    appfs_public_key_t public_key = { .index = key_index };
+    get_key_result = m_file.ioctl(I_APPFS_GET_PUBLIC_KEY, &public_key).return_value();
+    //ensure zero terminated id
+    public_key.id[sizeof(public_key.id) - 1] = 0;
+
+    if( get_key_result == 0 ){
+      result.push_back(PublicKey(public_key));
+    }
+    key_index++;
+  } while( get_key_result == 0 && key_index < 256);
+
+  return result;
+}
+
 Appfs::Info Appfs::get_info(const var::StringView path) {
   API_RETURN_VALUE_IF_ERROR(Info());
   appfs_file_t appfs_file_header;
@@ -328,7 +366,7 @@ Appfs::Info Appfs::get_info(const var::StringView path) {
 
   const var::StringView app_name = appfs_file_header.hdr.name;
 
-  appfs_info_t info = {0};
+  appfs_info_t info = {};
   if (
     path_name == app_name
 #if defined __link

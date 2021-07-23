@@ -197,6 +197,23 @@ public:
     appfs_file_t m_file_header;
   };
 
+  class PublicKey {
+  public:
+    PublicKey() : m_value{} {}
+    PublicKey(const appfs_public_key_t & value) : m_value(value) {}
+
+    var::View get_key_view() const {
+      return var::View(m_value.value);
+    }
+
+    const char * id() const {
+      return reinterpret_cast<const char *>(m_value.id);
+    }
+
+  private:
+    appfs_public_key_t m_value;
+  };
+
   class Construct {
   public:
     Construct() : m_mount("/app") {}
@@ -231,6 +248,8 @@ public:
   static constexpr u32 overhead() { return sizeof(appfs_file_t); }
 
   Info get_info(const var::StringView path);
+
+  var::Vector<PublicKey> get_public_key_list() const;
 
 #if !defined __link
 
