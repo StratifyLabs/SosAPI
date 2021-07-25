@@ -13,6 +13,7 @@
 
 #include "sos/Appfs.hpp"
 #include "sos/Link.hpp"
+#include "sos/Auth.hpp"
 
 #if defined __link
 #define FILE_BASE Link
@@ -162,13 +163,13 @@ Appfs &Appfs::append(
   const fs::FileObject &file,
   const api::ProgressCallback *progress_callback) {
 
-  const auto signature = crypto::Dsa::get_signature(file);
+  const auto signature = Auth::get_signature(file);
   const auto is_signature_required
     = m_file.ioctl(I_APPFS_IS_SIGNATURE_REQUIRED, nullptr).return_value() == 1;
 
   if (m_data_size == 0 && m_request == I_APPFS_INSTALL) {
     if (is_signature_required) {
-      m_data_size = file.size() - sizeof(crypt_api_signature512_marker_t);
+      m_data_size = file.size() - sizeof(auth_signature_marker_t);
     } else {
       m_data_size = file.size();
     }

@@ -19,6 +19,15 @@
 #define IOCTL(REQUEST, CTL) ::ioctl(m_fd, REQUEST, CTL)
 #endif
 
+namespace printer {
+class Printer;
+Printer &operator<<(Printer &printer, const sos::Auth::SignatureInfo &a) {
+  return printer
+    .key("hash", var::View(a.hash()).to_string<var::GeneralString>())
+    .key("signature", a.signature().to_string());
+}
+} // namespace printer
+
 using namespace sos;
 
 Auth::Token::Token(const var::StringView token) {
@@ -79,10 +88,10 @@ bool Auth::authenticate(var::View key) {
   return false;
 }
 
-crypto::Dsa::Key Auth::get_public_key() const {
+crypto::Dsa::PublicKey Auth::get_public_key() const {
   auth_public_key_t key;
   m_file.ioctl(I_AUTH_GET_PUBLIC_KEY, &key);
-  return crypto::Dsa::Key(var::View(key));
+  return crypto::Dsa::PublicKey(var::View(key));
 }
 
 Auth::Token Auth::start(const Token &token) {
@@ -99,4 +108,88 @@ Auth::Token Auth::finish(const Token &token) {
     return Token();
   }
   return Token(result);
+}
+
+Auth::SignatureInfo
+Auth::get_signature_info(const fs::FileObject &file) {
+
+  fs::File::LocationScope ls(file);
+
+  if (file.size() < sizeof(auth_signature_marker_t)) {
+    return SignatureInfo();
+  }
+  const size_t hash_size
+    = file.size() - sizeof(auth_signature_marker_t);
+
+  auto hash = [](const fs::FileObject &file, size_t hash_size) {
+    crypto::Sha256 result;
+    fs::File::LocationScope ls(file);
+    file.seek(0);
+    fs::NullFile().write(file, result, fs::File::Write().set_size(hash_size));
+    return result.output();
+  }(file, hash_size);
+
+  return SignatureInfo().set_hash(hash).set_signature(get_signature(file));
+}
+
+crypto::Dsa::Signature
+Auth::get_signature(const fs::FileObject &file) {
+  if (file.size() < sizeof(auth_signature_marker_t)) {
+    return crypto::Dsa::Signature();
+  }
+
+  fs::File::LocationScope ls(file);
+
+  const size_t marker_location
+    = file.size() - sizeof(auth_signature_marker_t);
+  auth_signature_marker_t signature;
+  file.seek(marker_location).read(var::View(signature).fill(0));
+
+  if (
+    (signature.start == AUTH_SIGNATURE_MARKER_START)
+    && (signature.next == AUTH_SIGNATURE_MARKER_NEXT)
+    && (signature.size == AUTH_SIGNATURE_MARKER_SIZE + 512)) {
+    return crypto::Dsa::Signature(var::View(signature.signature.data));
+  } else {
+    return crypto::Dsa::Signature();
+  }
+}
+
+crypto::Dsa::Signature Auth::sign(const fs::FileObject & file, const crypto::Dsa & dsa){
+  fs::File::LocationScope ls(file);
+  const auto hash = crypto::Sha256::get_hash(file.seek(0));
+  const auto signature = dsa.sign(hash);
+  append(file, signature);
+  return signature;
+}
+
+void Auth::append(
+  const fs::FileObject &file,
+  const crypto::Dsa::Signature &signature) {
+
+  fs::File::LocationScope ls(file);
+
+  auth_signature_marker_t marker = {
+    .start = AUTH_SIGNATURE_MARKER_START,
+    .next = AUTH_SIGNATURE_MARKER_NEXT,
+    .size = AUTH_SIGNATURE_MARKER_SIZE + 512};
+
+  var::View(marker.signature.data).copy(signature.data());
+  file.seek(0, fs::File::Whence::end).write(var::View(marker));
+}
+
+bool Auth::verify(
+  const fs::FileObject &file,
+  const crypto::Dsa::PublicKey &public_key) {
+  // hash the file up to the marker
+  fs::File::LocationScope ls(file);
+
+  if (file.size() < sizeof(auth_signature_marker_t)) {
+    return false;
+  }
+
+  const auto signature_info = get_signature_info(file);
+
+  return crypto::Dsa(crypto::Dsa::KeyPair().set_public_key(public_key))
+    .verify(signature_info.signature(), signature_info.hash());
 }

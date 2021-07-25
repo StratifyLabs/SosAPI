@@ -9,6 +9,7 @@
 #include <fs/File.hpp>
 #include <var/String.hpp>
 #include <crypto/Ecc.hpp>
+#include <crypto/Sha256.hpp>
 
 #include "Link.hpp"
 
@@ -88,9 +89,21 @@ public:
   Token start(const Token &token);
   Token finish(const Token &token);
 
-  crypto::Dsa::Key get_public_key() const;
+  crypto::Dsa::PublicKey get_public_key() const;
 
   bool is_valid() const { return is_success(); }
+
+
+  class SignatureInfo {
+    API_AC(SignatureInfo, crypto::Dsa::Signature, signature);
+    API_AC(SignatureInfo, crypto::Sha256::Hash, hash);
+  };
+
+  static SignatureInfo get_signature_info(const fs::FileObject & file);
+  static crypto::Dsa::Signature get_signature(const fs::FileObject & file);
+  static crypto::DigitalSignatureAlgorithm::Signature sign(const fs::FileObject & file, const crypto::Dsa & dsa);
+  static void append(const fs::FileObject & file, const crypto::Dsa::Signature & signature);
+  static bool verify(const fs::FileObject & file, const crypto::Dsa::PublicKey & public_key);
 
 private:
 #if defined __link
@@ -102,5 +115,10 @@ private:
 };
 
 } // namespace sys
+
+namespace printer {
+Printer &
+operator<<(Printer &printer, const sos::Auth::SignatureInfo &a);
+} // namespace printer
 
 #endif // SOSAPI_AUTH_HPP

@@ -692,17 +692,17 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
 
   fs::ViewFile image = fs::ViewFile(image_file.data()).move();
 
-  bootloader_signature_t signature = {};
-  crypt_api_signature512_marker_t signature_marker;
+  auth_signature_t signature = {};
+  auth_signature_marker_t signature_marker;
   if (is_signature_required) {
     // the signature is the last 64 bytes of the OS image
     // the signature is NOT written to the device
-    const auto signature_location = image.size() - sizeof(crypt_api_signature512_marker_t);
+    const auto signature_location = image.size() - sizeof(auth_signature_marker_t);
     image.seek(signature_location)
       .read(var::View(signature_marker))
       .seek(0);
 
-    memcpy(signature.data, signature_marker.signature, 64);
+    memcpy(signature.data, signature_marker.signature.data, 64);
 
     image = fs::ViewFile(var::View(image_file.data()).truncate(signature_location)).move();
   }
