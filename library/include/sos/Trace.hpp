@@ -24,7 +24,7 @@ namespace sos {
  */
 class TraceEvent {
 public:
-  TraceEvent() { m_event = {0}; }
+  TraceEvent() { m_event = {}; }
   TraceEvent(const link_trace_event_t &event) : m_event(event) {}
 
   /*! \details Returns the trace id. */
