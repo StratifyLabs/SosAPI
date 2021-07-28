@@ -369,7 +369,6 @@ public:
     return is_connected() && !is_bootloader();
   }
 
-
   var::Array<u8, 64> get_public_key();
 
   Link &write_flash(int addr, const void *buf, int nbyte);
@@ -383,6 +382,7 @@ public:
     API_AF(UpdateOs, u32, bootloader_retry_count, 20);
     API_AF(UpdateOs, printer::Printer *, printer, nullptr);
     API_AB(UpdateOs, verify, false);
+    API_AC(UpdateOs, var::PathString, flash_path);
   };
 
   Link &update_os(const UpdateOs &options);
@@ -599,14 +599,26 @@ private:
 
   Info m_link_info;
 
-  bootloader_attr_t m_bootloader_attributes = {0};
-  link_transport_mdriver_t m_driver_instance = {0};
+  bootloader_attr_t m_bootloader_attributes = {};
+  link_transport_mdriver_t m_driver_instance = {};
+
+  enum class UseBootloaderId {
+    no, yes
+  };
 
   u32 validate_os_image_id_with_connected_bootloader(
-    const fs::FileObject *source_image);
+    const fs::FileObject *source_image, UseBootloaderId bootloader_id = UseBootloaderId::yes);
 
+
+  //these use the bootloader
   Link &erase_os(const UpdateOs &options);
   Link &install_os(u32 image_id, const UpdateOs &options);
+
+  //these use a bootloader running a full Stratify OS instance
+  void update_os_flash_device(const UpdateOs & options);
+  void erase_os_flash_device(const UpdateOs & options, const File& flash_device);
+  void install_os_flash_device(const UpdateOs &options, const File& flash_device);
+
   Link &reset_progress();
 
   enum class Connection { null, bootloader, os };

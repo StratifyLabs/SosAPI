@@ -89,7 +89,7 @@ bool Auth::authenticate(var::View key) {
 }
 
 crypto::Dsa::PublicKey Auth::get_public_key() const {
-  auth_public_key_t key;
+  auth_public_key_t key = {};
   m_file.ioctl(I_AUTH_GET_PUBLIC_KEY, &key);
   return crypto::Dsa::PublicKey(var::View(key));
 }
