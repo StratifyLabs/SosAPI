@@ -11,15 +11,16 @@
 #include <string>
 
 #include <chrono.hpp>
-#include <fs/File.hpp>
 #include <fs/DataFile.hpp>
-#include <fs/ViewFile.hpp>
+#include <fs/File.hpp>
 #include <fs/Path.hpp>
+#include <fs/ViewFile.hpp>
 #include <var.hpp>
 
 #include "sos/Appfs.hpp"
 #include "sos/Link.hpp"
 #include "sos/Sys.hpp"
+#include "sos/Auth.hpp"
 
 #define MAX_TRIES 3
 
@@ -519,7 +520,8 @@ Link &Link::get_bootloader_attr(bootloader_attr_t &attr) {
 }
 
 u32 Link::validate_os_image_id_with_connected_bootloader(
-  const FileObject *source_image) {
+  const FileObject *source_image,
+  UseBootloaderId use_bootloader_info) {
   API_RETURN_VALUE_IF_ERROR(0);
   u32 image_id;
 
@@ -544,13 +546,17 @@ u32 Link::validate_os_image_id_with_connected_bootloader(
 
   m_progress_max = static_cast<int>(source_image->size());
 
-  if ((image_id & ~0x01) != (m_bootloader_attributes.hardware_id & ~0x01)) {
+  const u32 hardware_id = use_bootloader_info == UseBootloaderId::yes
+                            ? m_bootloader_attributes.hardware_id
+                            : m_link_info.hardware_id();
+
+  if ((image_id & ~0x01) != (hardware_id & ~0x01)) {
     API_RETURN_VALUE_ASSIGN_ERROR(
       0,
       GeneralString().format(
         "invalid image id binary:0x%08lx bootloader:0x%08lx",
         image_id,
-        m_bootloader_attributes.hardware_id),
+        hardware_id),
       EINVAL);
   }
 
@@ -622,20 +628,24 @@ Link &Link::erase_os(const UpdateOs &options) {
 }
 
 bool Link::is_signature_required() {
-  if( is_bootloader() ){
+  if( is_connected() == false ){
+      return false;
+  }
+
+  if (is_bootloader()) {
     bootloader_attr_t attr;
     get_bootloader_attr(attr);
     return link_is_signature_required(driver(), &attr);
   }
+
   return false;
 }
 
-
-var::Array<u8, 64> Link::get_public_key(){
+var::Array<u8, 64> Link::get_public_key() {
   var::Array<u8, 64> result;
   result.fill(0);
 
-  if( is_bootloader() ){
+  if (is_bootloader()) {
     bootloader_attr_t attr;
     get_bootloader_attr(attr);
     link_get_public_key(driver(), &attr, result.data(), result.count());
@@ -643,7 +653,6 @@ var::Array<u8, 64> Link::get_public_key(){
 
   return result;
 }
-
 
 Link &Link::install_os(u32 image_id, const UpdateOs &options) {
   API_RETURN_VALUE_IF_ERROR(*this);
@@ -667,7 +676,6 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
   // var::Data start_address_buffer(256);
   var::Data buffer(buffer_size);
   var::Data compare_buffer(buffer_size);
-
 
   if (options.image()->seek(0).is_error()) {
     API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
@@ -697,14 +705,15 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
   if (is_signature_required) {
     // the signature is the last 64 bytes of the OS image
     // the signature is NOT written to the device
-    const auto signature_location = image.size() - sizeof(auth_signature_marker_t);
-    image.seek(signature_location)
-      .read(var::View(signature_marker))
-      .seek(0);
+    const auto signature_location
+      = image.size() - sizeof(auth_signature_marker_t);
+    image.seek(signature_location).read(var::View(signature_marker)).seek(0);
 
     memcpy(signature.data, signature_marker.signature.data, 64);
 
-    image = fs::ViewFile(var::View(image_file.data()).truncate(signature_location)).move();
+    image
+      = fs::ViewFile(var::View(image_file.data()).truncate(signature_location))
+          .move();
   }
 
   API_RETURN_VALUE_IF_ERROR(*this);
@@ -748,17 +757,17 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
 
   if (err == 0) {
 
-    if( attr.version >= 0x400 ){
-      //this is called even if the signature
-      //does not require verification
-      //this triggers the target to install
-      //the first flash page
+    if (attr.version >= 0x400) {
+      // this is called even if the signature
+      // does not require verification
+      // this triggers the target to install
+      // the first flash page
       link_verify_signature(driver(), &attr, &signature);
     }
 
-    //the signature implicitly verifies the code
-    //AND bootloaders that require a signature
-    //do not allow reading back code
+    // the signature implicitly verifies the code
+    // AND bootloaders that require a signature
+    // do not allow reading back code
     if (options.is_verify() && !is_signature_required) {
 
       options.image()->seek(0);
@@ -876,6 +885,11 @@ Link &Link::update_os(const UpdateOs &options) {
   }
 
   if (is_bootloader() == false) {
+    if (options.flash_path().is_empty() == false) {
+      update_os_flash_device(options);
+      return *this;
+    }
+
     API_RETURN_VALUE_ASSIGN_ERROR(*this, "not bootloader", EINVAL);
   }
 
@@ -890,6 +904,143 @@ Link &Link::update_os(const UpdateOs &options) {
 
   options.printer()->set_progress_key(progress_key);
   return *this;
+}
+
+void Link::update_os_flash_device(const UpdateOs &options) {
+
+  validate_os_image_id_with_connected_bootloader(
+    options.image(),
+    UseBootloaderId::no);
+
+  API_RETURN_IF_ERROR();
+
+  const var::KeyString progress_key = options.printer()->progress_key();
+
+  Link::File flash_device(
+    options.flash_path(),
+    OpenMode::read_write(),
+    driver());
+  API_RETURN_IF_ERROR();
+
+  erase_os_flash_device(options, flash_device);
+  install_os_flash_device(options, flash_device);
+
+  options.printer()->set_progress_key(progress_key);
+}
+
+void Link::erase_os_flash_device(
+  const UpdateOs &options,
+  const Link::File &flash_device) {
+
+  API_RETURN_IF_ERROR();
+
+  const flash_os_info_t os_info = [&](){
+    flash_os_info_t result = {};
+    flash_device.ioctl(I_FLASH_GETOSINFO, &result);
+    return result;
+  }();
+
+
+  u32 size_erased = 0;
+  int page = flash_device.ioctl(I_FLASH_GET_PAGE, MCU_INT_CAST(os_info.start))
+               .return_value();
+
+  const api::ProgressCallback *progress_callback
+    = options.printer()->progress_callback();
+
+  options.printer()->set_progress_key("erasing");
+
+  if (progress_callback) {
+    progress_callback->update(
+      0,
+      api::ProgressCallback::indeterminate_progress_total());
+  }
+
+  do {
+    flash_pageinfo_t page_info = {};
+    page_info.page = page;
+    flash_device.ioctl(I_FLASH_GETPAGEINFO, &page_info);
+    size_erased += page_info.size;
+
+    link_transport_mastersettimeout(driver(), 5000);
+    flash_device.ioctl(I_FLASH_ERASEPAGE, MCU_INT_CAST(page));
+    link_transport_mastersettimeout(driver(), 0);
+
+    page++;
+
+    if (progress_callback) {
+      progress_callback->update(
+        page,
+        api::ProgressCallback::indeterminate_progress_total());
+    }
+
+  } while (size_erased < options.image()->size());
+
+  if (progress_callback) {
+    progress_callback->update(0, 0);
+  }
+
+}
+
+void Link::install_os_flash_device(
+  const UpdateOs &options,
+  const File &flash_device) {
+
+  API_RETURN_IF_ERROR();
+
+  const flash_os_info_t os_info = [&](){
+    flash_os_info_t result = {};
+    flash_device.ioctl(I_FLASH_GETOSINFO, &result);
+    return result;
+  }();
+
+  const api::ProgressCallback *progress_callback
+    = options.printer()->progress_callback();
+
+  if (progress_callback) {
+    options.printer()->set_progress_key("installing");
+  }
+
+  const bool is_signature_required = flash_device.ioctl(I_FLASH_IS_SIGNATURE_REQUIRED, nullptr).return_value() == 1;
+
+
+  const u32 image_size = options.image()->size();
+  const u32 install_size = is_signature_required ? image_size - sizeof(auth_signature_marker_t) : image_size;
+  u32 size_processed = 0;
+
+  do {
+    flash_writepage_t write_page;
+    const auto size_left = install_size - size_processed;
+    const u32 page_size = size_left > sizeof(write_page.buf) ? sizeof(write_page.buf) : size_left;
+
+    options.image()->read(var::View(write_page.buf, page_size));
+    write_page.addr = os_info.start + size_processed;
+    write_page.nbyte = page_size;
+    flash_device.ioctl(I_FLASH_WRITEPAGE, &write_page);
+    if( is_error() ){
+      break;
+    }
+
+    size_processed += page_size;
+
+    if (progress_callback) {
+      progress_callback->update(size_processed, install_size);
+    }
+
+  } while(size_processed < install_size);
+
+
+  if( is_signature_required ){
+    const auto signature_info = Auth::get_signature_info(options.image()->seek(0));
+    auth_signature_t signature = {};
+    View(signature).copy(signature_info.signature().data());
+    flash_device.ioctl(I_FLASH_VERIFY_SIGNATURE, &signature);
+  }
+
+  if (progress_callback) {
+    progress_callback->update(0, 0);
+  }
+
 }
 
 var::String Link::DriverPath::lookup_serial_port_path_from_usb_details() {
@@ -1068,7 +1219,6 @@ int Link::Dir::interface_readdir_r(
   struct dirent **resultp) const {
   return link_readdir_r(driver(), m_dirp, result, resultp);
 }
-
 
 int Link::Dir::interface_telldir() const {
   return link_telldir(driver(), m_dirp);
