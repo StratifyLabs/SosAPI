@@ -961,7 +961,11 @@ void Link::erase_os_flash_device(
     page_info.page = page;
     flash_device.ioctl(I_FLASH_GETPAGEINFO, &page_info);
     size_erased += page_info.size;
+
+    link_transport_mastersettimeout(driver(), 5000);
     flash_device.ioctl(I_FLASH_ERASEPAGE, MCU_INT_CAST(page));
+    link_transport_mastersettimeout(driver(), 0);
+
     page++;
 
     if (progress_callback) {
