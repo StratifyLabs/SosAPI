@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <printer/Printer.hpp>
 #include <crypto/Random.hpp>
 #include <crypto/Sha256.hpp>
 #include <fs/ViewFile.hpp>
@@ -20,7 +21,6 @@
 #endif
 
 namespace printer {
-class Printer;
 Printer &operator<<(Printer &printer, const sos::Auth::SignatureInfo &a) {
   return printer
     .key("size", var::NumberString(a.size()))
