@@ -97,6 +97,7 @@ public:
   class SignatureInfo {
     API_AC(SignatureInfo, crypto::Dsa::Signature, signature);
     API_AC(SignatureInfo, crypto::Sha256::Hash, hash);
+    API_AF(SignatureInfo, size_t, size, 0);
   };
 
   static SignatureInfo get_signature_info(const fs::FileObject & file);

@@ -23,6 +23,7 @@ namespace printer {
 class Printer;
 Printer &operator<<(Printer &printer, const sos::Auth::SignatureInfo &a) {
   return printer
+    .key("size", var::NumberString(a.size()))
     .key("hash", var::View(a.hash()).to_string<var::GeneralString>())
     .key("signature", a.signature().to_string());
 }
@@ -129,7 +130,7 @@ Auth::get_signature_info(const fs::FileObject &file) {
     return result.output();
   }(file, hash_size);
 
-  return SignatureInfo().set_hash(hash).set_signature(get_signature(file));
+  return SignatureInfo().set_hash(hash).set_signature(get_signature(file)).set_size(hash_size);
 }
 
 crypto::Dsa::Signature
