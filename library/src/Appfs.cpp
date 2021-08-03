@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <crypto/Ecc.hpp>
 #include <fs.hpp>
 #include <printer/Printer.hpp>
 #include <var.hpp>

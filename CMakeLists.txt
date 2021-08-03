@@ -16,8 +16,7 @@ if(NOT DEFINED API_IS_SDK)
 	include(CryptoAPI)
 endif()
 
-set(LOCAL_NAME SosAPI)
-project(${LOCAL_NAME} CXX)
+project(SosAPI CXX)
 include(CTest)
 
 add_subdirectory(library library)

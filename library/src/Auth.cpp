@@ -3,9 +3,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <printer/Printer.hpp>
 #include <crypto/Random.hpp>
 #include <crypto/Sha256.hpp>
+
+#include <printer/Printer.hpp>
 #include <fs/ViewFile.hpp>
 
 #include "sos/Auth.hpp"
