@@ -142,7 +142,7 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
       .truncate(sizeof((f->hdr.name)))
       .copy(fs::Path::name(options.name()));
 
-    f->hdr.mode = 0666;
+    f->hdr.mode = 0444;
     f->exec.code_size
       = options.size() + overhead(); // total number of bytes in file
     f->exec.signature = APPFS_CREATE_SIGNATURE;
@@ -167,12 +167,15 @@ Appfs &Appfs::append(
     = m_file.ioctl(I_APPFS_IS_SIGNATURE_REQUIRED, nullptr).return_value() == 1;
 
   if (m_data_size == 0 && m_request == I_APPFS_INSTALL) {
+    const auto file_size = file.size();
     if (is_signature_required) {
-      m_data_size = file.size() - sizeof(auth_signature_marker_t);
+      m_data_size = file_size - sizeof(auth_signature_marker_t);
     } else {
-      m_data_size = file.size();
+      m_data_size = file_size;
     }
   }
+
+  const auto progress_size = m_request == I_APPFS_INSTALL ? m_data_size : m_data_size - overhead();
 
   var::Array<char, APPFS_PAGE_SIZE> buffer;
 
@@ -180,7 +183,6 @@ Appfs &Appfs::append(
   buffer_view.fill(0);
 
   size_t bytes_written = 0;
-  const size_t file_size = file.size();
   while (file.read(buffer_view).return_value() > 0 && bytes_written < m_data_size) {
     const auto next = bytes_written + return_value();
     const auto page_size = next > m_data_size
@@ -189,7 +191,7 @@ Appfs &Appfs::append(
     bytes_written += page_size;
     append(var::View(buffer).truncate(page_size));
     if (progress_callback) {
-      progress_callback->update(bytes_written, file_size);
+      progress_callback->update(bytes_written, progress_size);
     }
   }
 
