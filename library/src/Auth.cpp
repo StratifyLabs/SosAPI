@@ -116,9 +116,18 @@ Auth::get_signature_info(const fs::FileObject &file) {
 
   fs::File::LocationScope ls(file);
 
+
+
   if (file.size() < sizeof(auth_signature_marker_t)) {
     return SignatureInfo();
   }
+
+  const auto signature = get_signature(file);
+
+  if( signature.is_valid() == false ){
+    return SignatureInfo();
+  }
+
   const size_t hash_size
     = file.size() - sizeof(auth_signature_marker_t);
 
@@ -130,7 +139,7 @@ Auth::get_signature_info(const fs::FileObject &file) {
     return result.output();
   }(file, hash_size);
 
-  return SignatureInfo().set_hash(hash).set_signature(get_signature(file)).set_size(hash_size);
+  return SignatureInfo().set_hash(hash).set_signature(signature).set_size(hash_size);
 }
 
 crypto::Dsa::Signature
@@ -143,8 +152,8 @@ Auth::get_signature(const fs::FileObject &file) {
 
   const size_t marker_location
     = file.size() - sizeof(auth_signature_marker_t);
-  auth_signature_marker_t signature;
-  file.seek(marker_location).read(var::View(signature).fill(0));
+  auth_signature_marker_t signature = {};
+  file.seek(marker_location).read(var::View(signature));
 
   if (
     (signature.start == AUTH_SIGNATURE_MARKER_START)

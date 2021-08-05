@@ -194,7 +194,7 @@ Appfs &Appfs::append(
     }
   }
 
-  if (is_signature_required) {
+  if (is_signature_required && m_request == I_APPFS_INSTALL) {
     appfs_verify_signature_t verify_signature;
     View(verify_signature.data).copy(signature.data());
     m_file.ioctl(I_APPFS_VERIFY_SIGNATURE, &verify_signature);
