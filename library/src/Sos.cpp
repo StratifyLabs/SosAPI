@@ -6,6 +6,8 @@
 #include <sos/process.h>
 #include <sos/sos.h>
 
+#include <sys/wait.h>
+
 #include <var/StackString.hpp>
 
 #include "sos/Sos.hpp"
@@ -59,6 +61,13 @@ var::PathString Sos::launch(const Launch &options) const {
     return var::PathString();
   }
   return result;
+}
+
+Sos &Sos::wait_pid(NoHang no_hang, int pid) {
+  API_RETURN_VALUE_IF_ERROR(*this);
+  const int flags = no_hang == NoHang::yes ? WNOHANG : 0;
+  API_SYSTEM_CALL("", ::waitpid(pid, &m_child_status, flags));
+  return *this;
 }
 
 var::PathString Sos::install(

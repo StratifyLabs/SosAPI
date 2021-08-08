@@ -2,7 +2,7 @@
 
 ## New Features
 
-- none yet
+- Add `Sos::wait_pid()` method to access unistd `waitpid()`
 
 ## Bug Fixes
 

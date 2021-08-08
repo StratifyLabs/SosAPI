@@ -50,6 +50,12 @@ public:
     int ram_size,
     const api::ProgressCallback *progress_callback) const;
 
+  enum class NoHang {
+    no, yes
+  };
+
+  Sos & wait_pid(NoHang no_hang = NoHang::no, int pid = -1);
+
   void powerdown(const chrono::MicroTime &duration = 0_milliseconds);
 
   const Sos &
@@ -61,6 +67,9 @@ public:
   static void redirect_stdin(int fd) { _impure_ptr->_stdin->_file = fd; }
 
   static void redirect_stderr(int fd) { _impure_ptr->_stderr->_file = fd; }
+
+private:
+  API_RAF(Sos, int, child_status, 0);
 };
 
 } // namespace sys
