@@ -302,25 +302,19 @@ var::Vector<Appfs::PublicKey> Appfs::get_public_key_list() const {
 Appfs::Info Appfs::get_info(const var::StringView path) {
   API_RETURN_VALUE_IF_ERROR(Info());
   appfs_file_t appfs_file_header = {};
-  API_PRINTF_TRACE_LINE();
-  API_PRINTF_TRACE_LINE();
   int result = FILE_BASE::File(
                  path,
                  fs::OpenMode::read_only() FSAPI_LINK_MEMBER_DRIVER_LAST)
                  .read(var::View(appfs_file_header))
                  .return_value();
-  API_PRINTF_TRACE_LINE();
 
   API_RETURN_VALUE_IF_ERROR(Info());
-  API_PRINTF_TRACE_LINE();
 
   if (result < static_cast<int>(sizeof(appfs_file_header))) {
     API_RETURN_VALUE_ASSIGN_ERROR(Info(), "get info", ENOEXEC);
   }
 
-  API_PRINTF_TRACE_LINE();
   appfs_file_header.hdr.name[APPFS_NAME_MAX] = 0;
-  API_PRINTF_TRACE_LINE();
 
   // first check to see if the name matches -- otherwise it isn't an app
   // file
