@@ -11,8 +11,8 @@
 #include <var.hpp>
 
 #include "sos/Appfs.hpp"
-#include "sos/Link.hpp"
 #include "sos/Auth.hpp"
+#include "sos/Link.hpp"
 
 #if defined __link
 #define FILE_BASE Link
@@ -22,52 +22,49 @@
 
 printer::Printer &
 printer::operator<<(printer::Printer &printer, const appfs_file_t &a) {
-  printer.key("name", var::StringView(a.hdr.name));
-  printer.key("id", var::StringView(a.hdr.id));
-  printer.key("mode", var::NumberString(a.hdr.mode, "0%o"));
-  printer.key(
-    "version",
-    var::NumberString()
-      .format("%d.%d", a.hdr.version >> 8, a.hdr.version & 0xff)
-      .string_view());
-  printer.key("startup", var::NumberString(a.exec.startup, "%p").string_view());
-  printer.key(
-    "codeStart",
-    var::NumberString(a.exec.code_start, "%p").string_view());
-  printer.key("codeSize", var::NumberString(a.exec.code_size).string_view());
-  printer.key(
-    "ramStart",
-    var::NumberString(a.exec.ram_start, "%p").string_view());
-  printer.key("ramSize", var::NumberString(a.exec.ram_size).string_view());
-  printer.key("dataSize", var::NumberString(a.exec.data_size).string_view());
-  printer.key(
-    "oFlags",
-    var::NumberString(a.exec.o_flags, "0x%lX").string_view());
-  printer.key(
-    "signature",
-    var::NumberString(a.exec.signature, "0x%08lx").string_view());
-  return printer;
+  return printer.key("name", var::StringView(a.hdr.name))
+    .key("id", var::StringView(a.hdr.id))
+    .key("mode", var::NumberString(a.hdr.mode, "0%o"))
+    .key(
+      "version",
+      var::NumberString()
+        .format("%d.%d", a.hdr.version >> 8, a.hdr.version & 0xff)
+        .string_view())
+    .key("startup", var::NumberString(a.exec.startup, "%p").string_view())
+    .key("codeStart", var::NumberString(a.exec.code_start, "%p").string_view())
+    .key("codeSize", var::NumberString(a.exec.code_size).string_view())
+    .key("ramStart", var::NumberString(a.exec.ram_start, "%p").string_view())
+    .key("ramSize", var::NumberString(a.exec.ram_size).string_view())
+    .key("dataSize", var::NumberString(a.exec.data_size).string_view())
+    .key("oFlags", var::NumberString(a.exec.o_flags, "0x%lX").string_view())
+    .key(
+      "signature",
+      var::NumberString(a.exec.signature, "0x%08lx").string_view());
+}
+
+printer::Printer &
+printer::operator<<(printer::Printer &printer, const sos::Appfs::PublicKey &a) {
+  return printer.key("id", a.id())
+    .key("publicKey", a.get_key_view().to_string<var::GeneralString>());
 }
 
 printer::Printer &printer::operator<<(
   printer::Printer &printer,
   const sos::Appfs::Appfs::FileAttributes &a) {
-  printer.key("name", a.name());
-  printer.key("id", a.id());
-  printer.key(
-    "version",
-    var::String().format("%d.%d", a.version() >> 8, a.version() & 0xff));
-
-  printer.key("signature", var::NumberString(a.signature(), "%x"));
-  printer.key_bool("flash", a.is_flash());
-  printer.key_bool("codeExternal", a.is_code_external());
-  printer.key_bool("dataExternal", a.is_data_external());
-  printer.key_bool("codeTightlyCoupled", a.is_code_tightly_coupled());
-  printer.key_bool("dataTightlyCoupled", a.is_data_tightly_coupled());
-  printer.key_bool("startup", a.is_startup());
-  printer.key_bool("unique", a.is_unique());
-  printer.key("ramSize", var::NumberString(a.ram_size()).string_view());
-  return printer;
+  return printer.key("name", a.name())
+    .key("id", a.id())
+    .key(
+      "version",
+      var::String().format("%d.%d", a.version() >> 8, a.version() & 0xff))
+    .key("signature", var::NumberString(a.signature(), "%x"))
+    .key_bool("flash", a.is_flash())
+    .key_bool("codeExternal", a.is_code_external())
+    .key_bool("dataExternal", a.is_data_external())
+    .key_bool("codeTightlyCoupled", a.is_code_tightly_coupled())
+    .key_bool("dataTightlyCoupled", a.is_data_tightly_coupled())
+    .key_bool("startup", a.is_startup())
+    .key_bool("unique", a.is_unique())
+    .key("ramSize", var::NumberString(a.ram_size()).string_view());
 }
 
 printer::Printer &
@@ -124,11 +121,13 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
 
   const auto path = options.mount() / "flash" / options.name();
 
-  if (FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER).exists(path)) {
+  if (
+    options.name().is_empty() == false
+    && FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER).exists(path)) {
     FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER).remove(path.string_view());
   }
 
-  if (options.is_executable() == false) {
+  if (options.is_executable() == false && options.name().is_empty() == false) {
 
     API_ASSERT(options.size() != 0);
     m_request = I_APPFS_CREATE;
@@ -151,10 +150,12 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
     m_bytes_written = overhead();
     m_data_size = f->exec.code_size;
 
-  } else {
+  } else if( options.is_executable() == true ){
     m_bytes_written = 0;
     m_data_size = 0;
     m_request = I_APPFS_INSTALL;
+  } else {
+    m_request = 0;
   }
 }
 
@@ -162,6 +163,7 @@ Appfs &Appfs::append(
   const fs::FileObject &file,
   const api::ProgressCallback *progress_callback) {
 
+  API_ASSERT(m_request != 0);
   const auto signature = Auth::get_signature(file);
   const auto is_signature_required
     = m_file.ioctl(I_APPFS_IS_SIGNATURE_REQUIRED, nullptr).return_value() == 1;
@@ -175,7 +177,8 @@ Appfs &Appfs::append(
     }
   }
 
-  const auto progress_size = m_request == I_APPFS_INSTALL ? m_data_size : m_data_size - overhead();
+  const auto progress_size
+    = m_request == I_APPFS_INSTALL ? m_data_size : m_data_size - overhead();
 
   var::Array<char, APPFS_PAGE_SIZE> buffer;
 
@@ -183,11 +186,11 @@ Appfs &Appfs::append(
   buffer_view.fill(0);
 
   size_t bytes_written = 0;
-  while (file.read(buffer_view).return_value() > 0 && bytes_written < m_data_size) {
+  while (file.read(buffer_view).return_value() > 0
+         && bytes_written < m_data_size) {
     const auto next = bytes_written + return_value();
-    const auto page_size = next > m_data_size
-                             ? m_data_size - bytes_written
-                             : return_value();
+    const auto page_size
+      = next > m_data_size ? m_data_size - bytes_written : return_value();
     bytes_written += page_size;
     append(var::View(buffer).truncate(page_size));
     if (progress_callback) {
@@ -263,6 +266,15 @@ bool Appfs::is_ram_available() {
   return first_entry != nullptr;
 }
 
+bool Appfs::is_signature_required() const {
+  API_RETURN_VALUE_IF_ERROR(false);
+  // use an error scope because not all devices will support
+  // I_APPFS_IS_SIGNATURE_REQUIRED
+  api::ErrorScope es;
+  return m_file.ioctl(I_APPFS_IS_SIGNATURE_REQUIRED, nullptr).return_value()
+         > 0;
+}
+
 var::Vector<Appfs::PublicKey> Appfs::get_public_key_list() const {
   var::Vector<Appfs::PublicKey> result;
   result.reserve(16);
@@ -290,19 +302,25 @@ var::Vector<Appfs::PublicKey> Appfs::get_public_key_list() const {
 Appfs::Info Appfs::get_info(const var::StringView path) {
   API_RETURN_VALUE_IF_ERROR(Info());
   appfs_file_t appfs_file_header = {};
+  API_PRINTF_TRACE_LINE();
+  API_PRINTF_TRACE_LINE();
   int result = FILE_BASE::File(
                  path,
                  fs::OpenMode::read_only() FSAPI_LINK_MEMBER_DRIVER_LAST)
                  .read(var::View(appfs_file_header))
                  .return_value();
+  API_PRINTF_TRACE_LINE();
 
   API_RETURN_VALUE_IF_ERROR(Info());
+  API_PRINTF_TRACE_LINE();
 
   if (result < static_cast<int>(sizeof(appfs_file_header))) {
     API_RETURN_VALUE_ASSIGN_ERROR(Info(), "get info", ENOEXEC);
   }
 
+  API_PRINTF_TRACE_LINE();
   appfs_file_header.hdr.name[APPFS_NAME_MAX] = 0;
+  API_PRINTF_TRACE_LINE();
 
   // first check to see if the name matches -- otherwise it isn't an app
   // file
