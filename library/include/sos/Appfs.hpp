@@ -244,6 +244,8 @@ public:
   bool is_flash_available();
   bool is_ram_available();
 
+  bool is_signature_required() const;
+
   static constexpr int page_size() { return APPFS_PAGE_SIZE; }
   static constexpr u32 overhead() { return sizeof(appfs_file_t); }
 
@@ -268,7 +270,7 @@ private:
   fs::File m_file;
 #endif
 
-  appfs_createattr_t m_create_install_attributes = {0};
+  appfs_createattr_t m_create_install_attributes = {};
   u32 m_bytes_written = 0;
   u32 m_data_size = 0;
   int m_request = I_APPFS_CREATE;
@@ -284,6 +286,7 @@ class Printer;
 Printer &operator<<(Printer &printer, const sos::Appfs::Info &a);
 Printer &operator<<(Printer &printer, const sos::Appfs::FileAttributes &a);
 Printer &operator<<(Printer &printer, const appfs_file_t &a);
+Printer &operator<<(Printer &printer, const sos::Appfs::PublicKey &a);
 } // namespace printer
 
 #endif /* SOSAPI_APPFS_HPP_ */
