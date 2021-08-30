@@ -27,7 +27,7 @@ public:
     return m_serial_number.sn[idx];
   }
 
-  bool operator==(const SerialNumber &serial_number);
+  bool operator==(const SerialNumber &serial_number) const;
   var::KeyString to_string() const;
   static SerialNumber from_string(var::StringView str);
 
