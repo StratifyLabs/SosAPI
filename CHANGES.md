@@ -6,6 +6,7 @@
 
 ## Bug Fixes
 
+- Add `const` to `SerialNumber::operator==()`
 - Minor cleanup for `Auth` class
 
 # Version 1.0.0
