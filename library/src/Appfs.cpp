@@ -72,19 +72,16 @@ printer::operator<<(printer::Printer &printer, const sos::Appfs::Info &a) {
   printer.key("name", a.name());
   printer.key("mode", var::NumberString(a.mode(), "0%o").string_view());
   if (a.is_executable()) {
-    printer.key("id", a.id());
-    printer.key(
-      "version",
-      var::String().format("%d.%d", a.version() >> 8, a.version() & 0xff));
-
-    printer.key(
-      "signature",
-      var::NumberString(a.signature(), F3208X).string_view());
-    printer.key("ram", var::NumberString(a.ram_size()).string_view());
-    printer.key_bool("orphan", a.is_orphan());
-    printer.key_bool("flash", a.is_flash());
-    printer.key_bool("startup", a.is_startup());
-    printer.key_bool("unique", a.is_unique());
+    printer.key("id", a.id())
+      .key(
+        "version",
+        var::String().format("%d.%d", a.version() >> 8, a.version() & 0xff))
+      .key("signature", var::NumberString(a.signature(), F3208X).string_view())
+      .key("ram", var::NumberString(a.ram_size()).string_view())
+      .key_bool("orphan", a.is_orphan())
+      .key_bool("flash", a.is_flash())
+      .key_bool("startup", a.is_startup())
+      .key_bool("unique", a.is_unique());
   }
   return printer;
 }
@@ -150,7 +147,7 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
     m_bytes_written = overhead();
     m_data_size = f->exec.code_size;
 
-  } else if( options.is_executable() == true ){
+  } else if (options.is_executable() == true) {
     m_bytes_written = 0;
     m_data_size = 0;
     m_request = I_APPFS_INSTALL;
