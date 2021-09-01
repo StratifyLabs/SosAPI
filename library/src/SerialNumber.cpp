@@ -19,7 +19,7 @@ SerialNumber SerialNumber::from_string(var::StringView str) {
 #else
     sscanf(
       s.cstring(),
-      "%08lX%08lX%08lX%08lX",
+      "%08X%08X%08X%08X",
 #endif
       &ret.m_serial_number.sn[3],
       &ret.m_serial_number.sn[2],
@@ -34,12 +34,8 @@ SerialNumber::SerialNumber(var::StringView str) {
   var::View(m_serial_number).copy(var::View(serial_number.m_serial_number));
 }
 
-bool SerialNumber::operator==(const SerialNumber &serial_number) {
-  return memcmp(
-           &serial_number.m_serial_number,
-           &m_serial_number,
-           sizeof(mcu_sn_t))
-         == 0;
+bool SerialNumber::operator==(const SerialNumber &serial_number) const {
+  return var::View(serial_number.m_serial_number) == var::View(m_serial_number);
 }
 
 var::KeyString SerialNumber::to_string() const {

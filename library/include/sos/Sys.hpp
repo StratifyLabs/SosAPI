@@ -27,8 +27,7 @@ public:
     friend class Sys;
 
   public:
-    Info() { m_info = {0}; }
-
+    Info() = default;
     explicit Info(const sys_info_t &info) : m_info(info) {}
 
     operator const sys_info_t &() const { return m_info; }
@@ -59,7 +58,7 @@ public:
     SerialNumber serial_number() const { return SerialNumber(m_info.serial); }
 
   private:
-    sys_info_t m_info;
+    sys_info_t m_info = {};
   };
 
   Sys() {}
