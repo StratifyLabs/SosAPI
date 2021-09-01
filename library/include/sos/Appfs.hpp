@@ -122,6 +122,10 @@ public:
       return set_flag_value(Flags::is_flash, value);
     }
 
+    FileAttributes &set_orphan(bool value = true) {
+      return set_flag_value(Flags::is_orphan, value);
+    }
+
     FileAttributes &set_code_external(bool value = true) {
       return set_flag_value(Flags::is_code_external, value);
     }

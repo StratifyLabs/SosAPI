@@ -2,6 +2,7 @@
 
 ## New Features
 
+- Add `set_orphan()` to `Appfs::FileAttributes`
 - Add `Sos::wait_pid()` method to access unistd `waitpid()`
 
 ## Bug Fixes
