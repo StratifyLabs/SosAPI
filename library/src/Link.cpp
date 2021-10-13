@@ -140,7 +140,7 @@ Link &Link::connect(var::StringView path, IsLegacy is_legacy) {
   API_RETURN_VALUE_IF_ERROR(*this);
 
   if (is_connected() && info().path() != path) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "already connected to a different path", EINVAL);
   }
 
   reset_progress();
@@ -286,7 +286,7 @@ Link &Link::get_time(struct tm *gt) {
   int err = -1;
   struct link_tm ltm;
   if (is_bootloader()) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "cannot get time from the bootloader", EIO);
   }
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
@@ -326,7 +326,7 @@ Link &Link::set_time(struct tm *gt) {
   ltm.tm_year = gt->tm_year;
 
   if (is_bootloader()) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EINVAL);
+    API_RETURN_VALUE_ASSIGN_ERROR(*this, "cannot set time of the bootloader", EINVAL);
     return *this;
   }
 
