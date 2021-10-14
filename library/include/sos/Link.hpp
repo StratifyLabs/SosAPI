@@ -321,7 +321,7 @@ public:
       return var::Tokenizer(
         path(),
         var::Tokenizer::Construct()
-          .set_delimeters("/")
+					.set_delimeters("/@")
           .set_maximum_delimeter_count(6));
     }
 
