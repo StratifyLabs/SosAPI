@@ -2,6 +2,7 @@
 
 ## New Features
 
+- Add `Auth::create_secure_file` and `Auth::create_plain_file`
 - Add `set_orphan()` to `Appfs::FileAttributes`
 - Add `Sos::wait_pid()` method to access unistd `waitpid()`
 

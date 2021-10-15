@@ -106,7 +106,30 @@ public:
   static void append(const fs::FileObject & file, const crypto::Dsa::Signature & signature);
   static bool verify(const fs::FileObject & file, const crypto::Dsa::PublicKey & public_key);
 
+
+#if defined __link
+  class CreateSecureFile {
+    API_AC(CreateSecureFile, var::StringView, input_path);
+    API_AC(CreateSecureFile, var::StringView, output_path);
+    API_AC(CreateSecureFile, var::StringView, key);
+    API_AF(CreateSecureFile, char, padding_character, '\n');
+    API_AB(CreateSecureFile, remove_key, true);
+    API_AF(CreateSecureFile, const api::ProgressCallback*, progress_callback, nullptr);
+  };
+
+  static void create_secure_file(const CreateSecureFile & options);
+
+  class CreatePlainFile {
+    API_AC(CreatePlainFile, var::StringView, input_path);
+    API_AC(CreatePlainFile, var::StringView, output_path);
+    API_AC(CreatePlainFile, var::StringView, key);
+    API_AF(CreatePlainFile, const api::ProgressCallback*, progress_callback, nullptr);
+  };
+  static void create_plain_file(const CreatePlainFile & options);
+#endif
+
 private:
+  static constexpr u32 secure_file_version = 0x00000100;
 #if defined __link
   API_AF(Auth, link_transport_mdriver_t *, driver, nullptr);
   Link::File m_file;
