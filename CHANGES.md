@@ -8,6 +8,7 @@
 
 ## Bug Fixes
 
+- Fix an `EINVAL` error when using `Appfs::append`
 - Add `const` to `SerialNumber::operator==()`
 - Minor cleanup for `Auth` class
 

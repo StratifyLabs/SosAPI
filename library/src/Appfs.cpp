@@ -159,11 +159,15 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
 Appfs &Appfs::append(
   const fs::FileObject &file,
   const api::ProgressCallback *progress_callback) {
+  API_RETURN_VALUE_IF_ERROR(*this);
 
   API_ASSERT(m_request != 0);
   const auto signature = Auth::get_signature(file);
-  const auto is_signature_required
-    = m_file.ioctl(I_APPFS_IS_SIGNATURE_REQUIRED, nullptr).return_value() == 1;
+  const auto is_signature_required = [&]() {
+    api::ErrorScope error_scope;
+    return m_file.ioctl(I_APPFS_IS_SIGNATURE_REQUIRED, nullptr).return_value()
+           == 1;
+  }();
 
   if (m_data_size == 0 && m_request == I_APPFS_INSTALL) {
     const auto file_size = file.size();
@@ -346,6 +350,7 @@ Appfs::Info Appfs::get_info(const var::StringView path) {
     info.o_flags = appfs_file_header.exec.o_flags;
     info.signature = appfs_file_header.exec.signature;
   } else {
+    printf("app name %s\n", appfs_file_header.hdr.name);
     API_RETURN_VALUE_ASSIGN_ERROR(Info(), "no app name", ENOEXEC);
   }
 
