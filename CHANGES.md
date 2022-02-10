@@ -10,6 +10,7 @@
 
 - Fix an `EINVAL` error when using `Appfs::append`
 - Add `const` to `SerialNumber::operator==()`
+- Fix include `sos/dev/auth.h` for building with Stratify OS
 
 # Version 1.1.0
 
