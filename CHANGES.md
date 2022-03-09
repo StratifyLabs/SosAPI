@@ -2,6 +2,7 @@
 
 ## New Features
 
+- Add `sos::Auth::signature_marker_size` for the file size change when appending signatures
 - Update `CMakeLists.txt` to require setup of SDK in a super-project
 - Add `Auth::create_secure_file` and `Auth::create_plain_file`
 - Add `set_orphan()` to `Appfs::FileAttributes`
