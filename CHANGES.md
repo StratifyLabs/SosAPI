@@ -2,6 +2,8 @@
 
 ## New Features
 
+- Add class `sos::AppfsLog` for saving log entries to flash memory
+- Update `sos::Appfs` file data to resume appending
 - Add `sos::Auth::signature_marker_size` for the file size change when appending signatures
 - Update `CMakeLists.txt` to require setup of SDK in a super-project
 - Add `Auth::create_secure_file` and `Auth::create_plain_file`
