@@ -152,19 +152,20 @@ public:
       API_AC(Construct, var::StringView, device_path);
     };
 
-    DriverPath() {}
+    DriverPath() = default;
 
     DriverPath(const Construct &options) {
-      set_path(
-        var::PathString() / (options.type() == Type::serial ? "serial" : "usb")
-        / options.vendor_id() / options.product_id()
-        / options.interface_number() / options.serial_number()
-        / options.device_path());
+      if (options.type() == Type::serial) {
+        set_path(var::PathString("@serial") / options.device_path());
+      } else {
+        set_path(
+          var::PathString("@usb") / options.vendor_id() / options.product_id()
+          / options.interface_number() / options.serial_number()
+          / options.device_path());
+      }
     }
 
-    DriverPath(const var::StringView driver_path) {
-      set_path(driver_path);
-    }
+    DriverPath(const var::StringView driver_path) { set_path(driver_path); }
 
     bool is_valid() const {
 
@@ -259,6 +260,16 @@ public:
     bool operator==(const DriverPath &a) const {
       // if both values are provided and they are not the same -- they are not
 
+      if (get_type() == Type::serial && a.get_type() == Type::serial) {
+        if (
+          !get_device_path().is_empty() && !a.get_device_path().is_empty()
+          && get_device_path() != a.get_device_path()) {
+          return false;
+        }
+
+        return true;
+      }
+
       if (
         (get_type() != Type::null) && (a.get_type() != Type::null)
         && (get_type() != a.get_type())) {
@@ -321,7 +332,7 @@ public:
       return var::Tokenizer(
         path(),
         var::Tokenizer::Construct()
-					.set_delimeters("/@")
+          .set_delimeters("/@")
           .set_maximum_delimeter_count(6));
     }
 
@@ -557,8 +568,8 @@ public:
     fs::PathList read_directory(
       const var::StringView path,
       IsRecursive is_recursive = IsRecursive::no,
-      bool (*exclude)(var::StringView, void * context) = nullptr,
-      void * context = nullptr) const;
+      bool (*exclude)(var::StringView, void *context) = nullptr,
+      void *context = nullptr) const;
 
     class Rename {
       API_AC(Rename, var::StringView, source);
@@ -602,22 +613,21 @@ private:
   bootloader_attr_t m_bootloader_attributes = {};
   link_transport_mdriver_t m_driver_instance = {};
 
-  enum class UseBootloaderId {
-    no, yes
-  };
+  enum class UseBootloaderId { no, yes };
 
   u32 validate_os_image_id_with_connected_bootloader(
-    const fs::FileObject *source_image, UseBootloaderId bootloader_id = UseBootloaderId::yes);
+    const fs::FileObject *source_image,
+    UseBootloaderId bootloader_id = UseBootloaderId::yes);
 
-
-  //these use the bootloader
+  // these use the bootloader
   Link &erase_os(const UpdateOs &options);
   Link &install_os(u32 image_id, const UpdateOs &options);
 
-  //these use a bootloader running a full Stratify OS instance
-  void update_os_flash_device(const UpdateOs & options);
-  void erase_os_flash_device(const UpdateOs & options, const File& flash_device);
-  void install_os_flash_device(const UpdateOs &options, const File& flash_device);
+  // these use a bootloader running a full Stratify OS instance
+  void update_os_flash_device(const UpdateOs &options);
+  void erase_os_flash_device(const UpdateOs &options, const File &flash_device);
+  void
+  install_os_flash_device(const UpdateOs &options, const File &flash_device);
 
   Link &reset_progress();
 
