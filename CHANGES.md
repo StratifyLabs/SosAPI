@@ -1,3 +1,9 @@
+# Version 1.2.1
+
+## Bug Fixes
+
+- Fixed how `Link::DriverPath` generates paths (they must start with `@`)
+
 # Version 1.2.0
 
 ## New Features
