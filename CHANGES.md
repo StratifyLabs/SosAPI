@@ -1,10 +1,19 @@
-# Version 1.2.0
+# Version 1.3.0
 
 ## New Features
 
 - Add class `sos::AppfsLog` for saving log entries to flash memory
 - Update `sos::Appfs` file data to resume appending
 - Add `sos::Auth::signature_marker_size` for the file size change when appending signatures
+
+## Bug Fixes
+
+- Fixed how `Link::DriverPath` generates paths (they must start with `@`)
+
+# Version 1.2.0
+
+## New Features
+
 - Update `CMakeLists.txt` to require setup of SDK in a super-project
 - Add `Auth::create_secure_file` and `Auth::create_plain_file`
 - Add `set_orphan()` to `Appfs::FileAttributes`
