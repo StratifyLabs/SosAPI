@@ -7,10 +7,14 @@
 using namespace sos;
 
 Link::DriverPath::DriverPath(const Link::DriverPath::Construct &options) {
-  set_path(
-    var::PathString() / (options.type() == Type::serial ? "serial" : "usb")
-    / options.vendor_id() / options.product_id() / options.interface_number()
-    / options.serial_number() / options.device_path());
+  if (options.type() == Type::serial) {
+    set_path(var::PathString("@serial") / options.device_path());
+  } else {
+    set_path(
+      var::PathString("@usb") / options.vendor_id() / options.product_id()
+      / options.interface_number() / options.serial_number()
+      / options.device_path());
+  }
 }
 
 Link::DriverPath::DriverPath(const var::StringView driver_path) {
@@ -29,6 +33,7 @@ bool Link::DriverPath::is_valid() const {
 
   return true;
 }
+
 Link::Type Link::DriverPath::get_type() const {
   if (get_driver_name() == "usb") {
     return Type::usb;
@@ -108,6 +113,15 @@ bool Link::DriverPath::is_partial() const {
 
 bool Link::DriverPath::operator==(const Link::DriverPath &a) const {
   // if both values are provided and they are not the same -- they are not
+
+  if (get_type() == Type::serial && a.get_type() == Type::serial) {
+    if (
+      !get_device_path().is_empty() && !a.get_device_path().is_empty()
+      && get_device_path() != a.get_device_path()) {
+      return false;
+    }
+    return true;
+  }
 
   if (
     (get_type() != Type::null) && (a.get_type() != Type::null)
