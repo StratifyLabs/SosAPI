@@ -1,7 +1,7 @@
 // Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
 
-#ifndef SOSAPI_APPFS_HPP_
-#define SOSAPI_APPFS_HPP_
+#ifndef SOS_API_SOS_APPFS_HPP_
+#define SOS_API_SOS_APPFS_HPP_
 
 #include <api/api.hpp>
 #include <fs/File.hpp>
@@ -36,83 +36,103 @@ class Appfs : public api::ExecutionContext, public AppfsFlags {
 public:
   class Info : public AppfsFlags {
   public:
-    Info() { memset(&m_info, 0, sizeof(m_info)); }
+    Info() = default;
 
     explicit Info(const appfs_info_t &info) {
       memcpy(&m_info, &info, sizeof(appfs_info_t));
     }
 
-    bool is_valid() const { return m_info.signature != 0; }
+    API_NO_DISCARD bool is_valid() const { return m_info.signature != 0; }
 
-    const var::StringView id() const {
-      return var::StringView(reinterpret_cast<const char *>(m_info.id));
+    API_NO_DISCARD var::StringView id() const {
+      using ConstCharCast = const char *;
+      return var::StringView(ConstCharCast(m_info.id));
     }
 
-    const var::StringView name() const {
-      return var::StringView(reinterpret_cast<const char *>(m_info.name));
+    API_NO_DISCARD var::StringView name() const {
+      using ConstCharCast = const char *;
+      return var::StringView(ConstCharCast(m_info.name));
     }
 
-    u16 mode() const { return m_info.mode; }
-    u16 version() const { return m_info.version; }
+    API_NO_DISCARD u16 mode() const { return m_info.mode; }
+    API_NO_DISCARD u16 version() const { return m_info.version; }
 
-    u32 ram_size() const { return m_info.ram_size; }
+    API_NO_DISCARD u32 ram_size() const { return m_info.ram_size; }
 
-    u32 o_flags() const { return m_info.o_flags; }
+    API_NO_DISCARD u32 o_flags() const { return m_info.o_flags; }
 
-    u32 signature() const { return m_info.signature; }
-    bool is_executable() const { return m_info.mode & 0111; }
-    bool is_startup() const { return is_flag(Flags::is_startup); }
-    bool is_flash() const { return is_flag(Flags::is_flash); }
-    bool is_code_external() const { return is_flag(Flags::is_code_external); }
-    bool is_data_external() const { return is_flag(Flags::is_data_external); }
-    bool is_code_tightly_coupled() const {
+    API_NO_DISCARD u32 signature() const { return m_info.signature; }
+    API_NO_DISCARD bool is_executable() const { return m_info.mode & 0111; }
+    API_NO_DISCARD bool is_startup() const {
+      return is_flag(Flags::is_startup);
+    }
+    API_NO_DISCARD bool is_flash() const { return is_flag(Flags::is_flash); }
+    API_NO_DISCARD bool is_code_external() const {
+      return is_flag(Flags::is_code_external);
+    }
+    API_NO_DISCARD bool is_data_external() const {
+      return is_flag(Flags::is_data_external);
+    }
+    API_NO_DISCARD bool is_code_tightly_coupled() const {
       return is_flag(Flags::is_code_tightly_coupled);
     }
 
-    bool is_data_tightly_coupled() const {
+    API_NO_DISCARD bool is_data_tightly_coupled() const {
       return is_flag(Flags::is_data_tightly_coupled);
     }
-    bool is_orphan() const { return is_flag(Flags::is_orphan); }
-    bool is_authenticated() const { return is_flag(Flags::is_authenticated); }
-    bool is_unique() const { return is_flag(Flags::is_unique); }
+    API_NO_DISCARD bool is_orphan() const { return is_flag(Flags::is_orphan); }
+    API_NO_DISCARD bool is_authenticated() const {
+      return is_flag(Flags::is_authenticated);
+    }
+    API_NO_DISCARD bool is_unique() const { return is_flag(Flags::is_unique); }
 
-    const appfs_info_t &info() const { return m_info; }
+    API_NO_DISCARD const appfs_info_t &info() const { return m_info; }
     appfs_info_t &info() { return m_info; }
 
   private:
-    appfs_info_t m_info;
+    appfs_info_t m_info = {};
 
-    bool is_flag(Flags flags) const {
+    API_NO_DISCARD bool is_flag(Flags flags) const {
       return (static_cast<Flags>(m_info.o_flags) & flags);
     }
   };
 
   class FileAttributes : public AppfsFlags {
   public:
-    FileAttributes(const fs::FileObject &existing);
+    explicit FileAttributes(const fs::FileObject &existing);
 
     explicit FileAttributes(const appfs_file_t &appfs_file);
 
     const FileAttributes &apply(const fs::FileObject &file) const;
 
-    Flags flags() const {
+    API_NO_DISCARD Flags flags() const {
       return static_cast<Flags>(m_file_header.exec.o_flags);
     }
 
-    u32 signature() const { return m_file_header.exec.signature; }
+    API_NO_DISCARD u32 signature() const {
+      return m_file_header.exec.signature;
+    }
 
-    bool is_flash() const { return flags() & Flags::is_flash; }
-    bool is_code_external() const { return flags() & Flags::is_code_external; }
-    bool is_data_external() const { return flags() & Flags::is_data_external; }
-    bool is_code_tightly_coupled() const {
+    API_NO_DISCARD bool is_flash() const { return flags() & Flags::is_flash; }
+    API_NO_DISCARD bool is_code_external() const {
+      return flags() & Flags::is_code_external;
+    }
+    API_NO_DISCARD bool is_data_external() const {
+      return flags() & Flags::is_data_external;
+    }
+    API_NO_DISCARD bool is_code_tightly_coupled() const {
       return flags() & Flags::is_code_tightly_coupled;
     }
-    bool is_data_tightly_coupled() const {
+    API_NO_DISCARD bool is_data_tightly_coupled() const {
       return flags() & Flags::is_data_tightly_coupled;
     }
-    bool is_startup() const { return flags() & Flags::is_startup; }
-    bool is_unique() const { return flags() & Flags::is_unique; }
-    bool is_authenticated() const { return flags() & Flags::is_authenticated; }
+    API_NO_DISCARD bool is_startup() const {
+      return flags() & Flags::is_startup;
+    }
+    API_NO_DISCARD bool is_unique() const { return flags() & Flags::is_unique; }
+    API_NO_DISCARD bool is_authenticated() const {
+      return flags() & Flags::is_authenticated;
+    }
 
     FileAttributes &set_startup(bool value = true) {
       return set_flag_value(Flags::is_startup, value);
@@ -150,19 +170,19 @@ public:
       return set_flag_value(Flags::is_authenticated, value);
     }
 
-    var::StringView name() const { return m_file_header.hdr.name; }
+    API_NO_DISCARD var::StringView name() const { return m_file_header.hdr.name; }
     FileAttributes &set_name(const var::StringView value) {
       var::View(m_file_header.hdr.name).fill(0).copy(value);
       return *this;
     }
 
-    var::StringView id() const { return m_file_header.hdr.id; }
+    API_NO_DISCARD var::StringView id() const { return m_file_header.hdr.id; }
     FileAttributes &set_id(const var::StringView value) {
       var::View(m_file_header.hdr.id).fill(0).copy(value);
       return *this;
     }
 
-    u32 ram_size() const { return m_file_header.exec.ram_size; }
+    API_NO_DISCARD u32 ram_size() const { return m_file_header.exec.ram_size; }
     FileAttributes &set_ram_size(u32 value) {
       if (value > 0) {
         m_file_header.exec.ram_size = value;
@@ -170,14 +190,14 @@ public:
       return *this;
     }
 
-    u16 version() const { return m_file_header.hdr.version; }
-    FileAttributes &set_version(u32 value) {
+    API_NO_DISCARD u16 version() const { return m_file_header.hdr.version; }
+    FileAttributes &set_version(u16 value) {
       m_file_header.hdr.version = value;
       return *this;
     }
 
-    u16 access_mode() const { return m_file_header.hdr.mode; }
-    FileAttributes &set_access_mode(u32 value) {
+    API_NO_DISCARD u16 access_mode() const { return m_file_header.hdr.mode; }
+    FileAttributes &set_access_mode(u16 value) {
       m_file_header.hdr.mode = value;
       return *this;
     }
@@ -203,19 +223,19 @@ public:
 
   class PublicKey {
   public:
-    PublicKey() : m_value{} {}
-    PublicKey(const appfs_public_key_t & value) : m_value(value) {}
+    PublicKey() = default;
+    explicit PublicKey(const appfs_public_key_t &value) : m_value(value) {}
 
-    var::View get_key_view() const {
+    API_NO_DISCARD var::View get_key_view() const {
       return var::View(m_value.value);
     }
 
-    const char * id() const {
+    API_NO_DISCARD const char *id() const {
       return reinterpret_cast<const char *>(m_value.id);
     }
 
   private:
-    appfs_public_key_t m_value;
+    appfs_public_key_t m_value = {};
   };
 
   class Construct {
@@ -230,32 +250,37 @@ public:
     API_ACCESS_BOOL(Construct, overwrite, false);
   };
 
-  Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_NULLPTR_LAST);
-  Appfs(FSAPI_LINK_DECLARE_DRIVER_NULLPTR);
+  explicit Appfs(
+    const Construct &options FSAPI_LINK_DECLARE_DRIVER_NULLPTR_LAST);
+  explicit Appfs(FSAPI_LINK_DECLARE_DRIVER_NULLPTR);
 
   Appfs &append(
     const fs::FileObject &file,
     const api::ProgressCallback *progress_callback = nullptr);
 
-  bool is_append_ready() const { return m_bytes_written < m_data_size; }
+  API_NO_DISCARD bool is_append_ready() const {
+    return m_bytes_written < m_data_size;
+  }
 
-  bool is_valid() const { return m_data_size != 0; }
-  u32 size() const { return m_data_size - sizeof(appfs_file_t); }
+  API_NO_DISCARD bool is_valid() const { return m_data_size != 0; }
+  API_NO_DISCARD u32 size() const { return m_data_size - sizeof(appfs_file_t); }
 
-  u32 bytes_written() const { return m_bytes_written; }
-  u32 bytes_available() const { return m_data_size - m_bytes_written; }
+  API_NO_DISCARD u32 bytes_written() const { return m_bytes_written; }
+  API_NO_DISCARD u32 bytes_available() const {
+    return m_data_size - m_bytes_written;
+  }
 
-  bool is_flash_available();
-  bool is_ram_available();
+  API_NO_DISCARD bool is_flash_available() const;
+  API_NO_DISCARD bool is_ram_available() const;
 
-  bool is_signature_required() const;
+  API_NO_DISCARD bool is_signature_required() const;
 
   static constexpr int page_size() { return APPFS_PAGE_SIZE; }
   static constexpr u32 overhead() { return sizeof(appfs_file_t); }
 
-  Info get_info(const var::StringView path);
+  API_NO_DISCARD Info get_info(const var::StringView path) const;
 
-  var::Vector<PublicKey> get_public_key_list() const;
+  API_NO_DISCARD var::Vector<PublicKey> get_public_key_list() const;
 
 #if !defined __link
 
@@ -280,7 +305,7 @@ private:
   int m_request = I_APPFS_CREATE;
 
   void create_asynchronous(const Construct &options);
-  void append(var::View blob);
+  void append_view(var::View blob);
 };
 
 } // namespace sos
@@ -293,4 +318,4 @@ Printer &operator<<(Printer &printer, const appfs_file_t &a);
 Printer &operator<<(Printer &printer, const sos::Appfs::PublicKey &a);
 } // namespace printer
 
-#endif /* SOSAPI_APPFS_HPP_ */
+#endif /* SOS_API_SOS_APPFS_HPP_ */

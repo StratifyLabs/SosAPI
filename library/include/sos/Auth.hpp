@@ -105,6 +105,7 @@ public:
   static crypto::DigitalSignatureAlgorithm::Signature sign(const fs::FileObject & file, const crypto::Dsa & dsa);
   static void append(const fs::FileObject & file, const crypto::Dsa::Signature & signature);
   static bool verify(const fs::FileObject & file, const crypto::Dsa::PublicKey & public_key);
+  static constexpr size_t signature_marker_size = sizeof(auth_signature_marker_t);
 
 
 #if defined __link

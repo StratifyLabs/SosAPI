@@ -103,39 +103,78 @@ Appfs::FileAttributes::apply(const fs::FileObject &file) const {
   return *this;
 }
 
-Appfs::Appfs(FSAPI_LINK_DECLARE_DRIVER) {
+Appfs::Appfs(FSAPI_LINK_DECLARE_DRIVER)
 #if defined __link
+{
   set_driver(link_driver);
-#endif
 }
+#else
+  = default;
+#endif
 
 Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
   : m_file(
     "/app/.install",
     fs::OpenMode::write_only() FSAPI_LINK_INHERIT_DRIVER_LAST) {
 
+  API_ASSERT(!options.name().is_empty());
   FSAPI_LINK_SET_DRIVER((*this), link_driver);
 
   const auto path = options.mount() / "flash" / options.name();
 
-  if (
-    options.name().is_empty() == false
-    && FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER).exists(path)) {
-    FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER).remove(path.string_view());
+  if (FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER).exists(path)) {
+    if (options.is_overwrite()) {
+      FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER)
+        .remove(path.string_view());
+    } else {
+      if (options.is_executable()) {
+        API_RETURN_ASSIGN_ERROR(
+          "Cannot overwrite existing executable file",
+          EEXIST);
+      }
+
+      // reopen the existing file -- figure out how much data is left to write
+      // -- value is 0xffffffff
+      const auto info
+        = FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER).get_info(path);
+      m_request = I_APPFS_CREATE;
+
+      // f holds bytes in the buffer
+      m_data_size = info.size();
+      // first page must be fully written for the file to exist
+      m_bytes_written = page_size();
+
+      // now check to see how many other pages have been written
+      fs::File input(path);
+      // the seek offset to adjusted by overhead()
+      // the second page starts here
+      input.seek(page_size() - overhead());
+      u32 start = 0;
+      var::View start_view(start);
+      for (auto count : api::Index(m_data_size / page_size())) {
+        input.seek((count + 1) * page_size()).read(start_view);
+        if (start != 0xffffffff) {
+          m_bytes_written += page_size();
+        } else {
+          break;
+        }
+      }
+      return;
+    }
   }
 
-  if (options.is_executable() == false && options.name().is_empty() == false) {
+  if (options.is_executable() == false) {
 
     API_ASSERT(options.size() != 0);
     m_request = I_APPFS_CREATE;
 
-    appfs_file_t *f
+    auto *f
       = reinterpret_cast<appfs_file_t *>(m_create_install_attributes.buffer);
 
     // delete the settings if they exist
     var::View(f->hdr.name)
       .fill<u8>(0)
-      .truncate(sizeof((f->hdr.name)))
+      .truncate(sizeof(f->hdr.name))
       .copy(fs::Path::name(options.name()));
 
     f->hdr.mode = 0444;
@@ -193,7 +232,7 @@ Appfs &Appfs::append(
     const auto page_size
       = next > m_data_size ? m_data_size - bytes_written : return_value();
     bytes_written += page_size;
-    append(var::View(buffer).truncate(page_size));
+    append_view(var::View(buffer).truncate(page_size));
     if (progress_callback) {
       progress_callback->update(bytes_written, progress_size);
     }
@@ -212,7 +251,7 @@ Appfs &Appfs::append(
   return *this;
 }
 
-void Appfs::append(var::View blob) {
+void Appfs::append_view(var::View blob) {
   u32 bytes_written = 0;
   if (m_data_size && (m_bytes_written == m_data_size)) {
     API_RETURN_ASSIGN_ERROR("", ENOSPC);
@@ -251,7 +290,7 @@ void Appfs::append(var::View blob) {
   }
 }
 
-bool Appfs::is_flash_available() {
+bool Appfs::is_flash_available() const {
   API_RETURN_VALUE_IF_ERROR(false);
   const char *first_entry
     = FILE_BASE::Dir("/app/flash" FSAPI_LINK_MEMBER_DRIVER_LAST).read();
@@ -259,7 +298,7 @@ bool Appfs::is_flash_available() {
   return first_entry != nullptr;
 }
 
-bool Appfs::is_ram_available() {
+bool Appfs::is_ram_available() const {
   API_RETURN_VALUE_IF_ERROR(false);
   const char *first_entry
     = FILE_BASE::Dir("/app/ram" FSAPI_LINK_MEMBER_DRIVER_LAST).read();
@@ -300,7 +339,7 @@ var::Vector<Appfs::PublicKey> Appfs::get_public_key_list() const {
   return result;
 }
 
-Appfs::Info Appfs::get_info(const var::StringView path) {
+Appfs::Info Appfs::get_info(const var::StringView path) const {
   API_RETURN_VALUE_IF_ERROR(Info());
   appfs_file_t appfs_file_header = {};
   int result = FILE_BASE::File(
@@ -350,7 +389,6 @@ Appfs::Info Appfs::get_info(const var::StringView path) {
     info.o_flags = appfs_file_header.exec.o_flags;
     info.signature = appfs_file_header.exec.signature;
   } else {
-    printf("app name %s\n", appfs_file_header.hdr.name);
     API_RETURN_VALUE_ASSIGN_ERROR(Info(), "no app name", ENOEXEC);
   }
 
@@ -366,7 +404,7 @@ Appfs &Appfs::cleanup(CleanData clean_data) {
 
   fs::Dir dir("/app/ram");
 
-  while ((name = dir.read()) != 0) {
+  while ((name = dir.read()) != nullptr) {
     strcpy(buffer, "/app/ram/");
     strcat(buffer, name);
 
@@ -399,5 +437,4 @@ Appfs &Appfs::reclaim_ram(var::StringView path) {
   fs::File(path, fs::OpenMode::read_only()).ioctl(I_APPFS_RECLAIM_RAM, nullptr);
   return *this;
 }
-
 #endif

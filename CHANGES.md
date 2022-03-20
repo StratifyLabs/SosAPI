@@ -1,3 +1,15 @@
+# Version 1.3.0
+
+## New Features
+
+- Add class `sos::AppfsLog` for saving log entries to flash memory
+- Update `sos::Appfs` file data to resume appending
+- Add `sos::Auth::signature_marker_size` for the file size change when appending signatures
+
+## Bug Fixes
+
+- Fixed how `Link::DriverPath` generates paths (they must start with `@`)
+
 # Version 1.2.0
 
 ## New Features
@@ -10,6 +22,7 @@
 
 - Fix an `EINVAL` error when using `Appfs::append`
 - Add `const` to `SerialNumber::operator==()`
+- Fix include `sos/dev/auth.h` for building with Stratify OS
 
 # Version 1.1.0
 

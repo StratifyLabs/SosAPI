@@ -11,6 +11,8 @@
 #include <fs/ViewFile.hpp>
 #include <printer/Printer.hpp>
 
+#include <sos/dev/auth.h>
+
 #include "sos/Auth.hpp"
 
 #if defined __link
