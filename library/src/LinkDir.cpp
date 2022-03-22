@@ -1,6 +1,7 @@
 //
 // Created by Tyler Gilbert on 3/18/22.
 //
+#if defined __link
 
 #include "sos/Link.hpp"
 
@@ -55,3 +56,5 @@ void Link::Dir::interface_seekdir(size_t location) const {
 void Link::Dir::interface_rewinddir() const {
   link_rewinddir(driver(), dirp());
 }
+
+#endif

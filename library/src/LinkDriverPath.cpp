@@ -1,6 +1,7 @@
 //
 // Created by Tyler Gilbert on 3/18/22.
 //
+#if defined __link
 
 #include "sos/Link.hpp"
 
@@ -182,3 +183,5 @@ var::String Link::DriverPath::lookup_serial_port_path_from_usb_details() {
 #endif
   return var::String();
 }
+
+#endif
