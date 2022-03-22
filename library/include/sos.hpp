@@ -7,7 +7,6 @@ namespace sos {
 }
 
 #include "sos/Appfs.hpp"
-#include "sos/AppfsLog.hpp"
 #include "sos/Auth.hpp"
 #include "sos/Link.hpp"
 #include "sos/Sos.hpp"

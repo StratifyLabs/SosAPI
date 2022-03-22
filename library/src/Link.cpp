@@ -18,9 +18,9 @@
 #include <var.hpp>
 
 #include "sos/Appfs.hpp"
+#include "sos/Auth.hpp"
 #include "sos/Link.hpp"
 #include "sos/Sys.hpp"
-#include "sos/Auth.hpp"
 
 #define MAX_TRIES 3
 
@@ -140,7 +140,10 @@ Link &Link::connect(var::StringView path, IsLegacy is_legacy) {
   API_RETURN_VALUE_IF_ERROR(*this);
 
   if (is_connected() && info().path() != path) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "already connected to a different path", EINVAL);
+    API_RETURN_VALUE_ASSIGN_ERROR(
+      *this,
+      "already connected to a different path",
+      EINVAL);
   }
 
   reset_progress();
@@ -286,7 +289,10 @@ Link &Link::get_time(struct tm *gt) {
   int err = -1;
   struct link_tm ltm;
   if (is_bootloader()) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "cannot get time from the bootloader", EIO);
+    API_RETURN_VALUE_ASSIGN_ERROR(
+      *this,
+      "cannot get time from the bootloader",
+      EIO);
   }
 
   for (int tries = 0; tries < MAX_TRIES; tries++) {
@@ -326,7 +332,10 @@ Link &Link::set_time(struct tm *gt) {
   ltm.tm_year = gt->tm_year;
 
   if (is_bootloader()) {
-    API_RETURN_VALUE_ASSIGN_ERROR(*this, "cannot set time of the bootloader", EINVAL);
+    API_RETURN_VALUE_ASSIGN_ERROR(
+      *this,
+      "cannot set time of the bootloader",
+      EINVAL);
     return *this;
   }
 
@@ -628,8 +637,8 @@ Link &Link::erase_os(const UpdateOs &options) {
 }
 
 bool Link::is_signature_required() {
-  if( is_connected() == false ){
-      return false;
+  if (is_connected() == false) {
+    return false;
   }
 
   if (is_bootloader()) {
@@ -729,9 +738,6 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
       var::View buffer_view
         = var::View(buffer).truncate(start_address_buffer.count());
       var::View(start_address_buffer).copy(buffer_view);
-
-      // memcpy(stackaddr, buffer, 256);
-
       buffer_view.fill<u8>(0xff);
     }
 
@@ -757,13 +763,11 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
 
   if (err == 0) {
 
-    if (attr.version >= 0x400) {
-      // this is called even if the signature
-      // does not require verification
-      // this triggers the target to install
-      // the first flash page
-      link_verify_signature(driver(), &attr, &signature);
-    }
+    // this is called even if the signature
+    // does not require verification
+    // this triggers the target to install
+    // the first flash page
+    link_verify_signature(driver(), &attr, &signature);
 
     // the signature implicitly verifies the code
     // AND bootloaders that require a signature
@@ -784,7 +788,14 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
            = link_readflash(driver(), loc, compare_buffer.data(), bytes_read))
           != bytes_read) {
           if (err > 0) {
-            err = -1;
+            if (progress_callback) {
+              progress_callback->update(0, 0);
+            }
+            API_RETURN_VALUE_ASSIGN_ERROR(
+              *this,
+              "failed to write flash when installing OS with result "
+                | get_device_result_error(err),
+              EIO);
           }
           break;
 
@@ -825,20 +836,26 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
     }
 
     // write the start block
-    if (
-      link_writeflash(
-        driver(),
-        start_address,
-        start_address_buffer.data(),
-        start_address_buffer.count())
-      != (int)start_address_buffer.count()) {
+    if (attr.version < 0x400) {
+      if (int result = link_writeflash(
+            driver(),
+            start_address,
+            start_address_buffer.data(),
+            start_address_buffer.count());
+          result != (int)start_address_buffer.count()) {
 
-      if (progress_callback) {
-        progress_callback->update(0, 0);
+        if (progress_callback) {
+          progress_callback->update(0, 0);
+        }
+
+        link_eraseflash(driver());
+
+        API_RETURN_VALUE_ASSIGN_ERROR(
+          *this,
+          "failed to write last flash page when installing OS with result "
+            | get_device_result_error(result),
+          EIO);
       }
-
-      link_eraseflash(driver());
-      API_RETURN_VALUE_ASSIGN_ERROR(*this, "", EIO);
     }
 
     if (options.is_verify()) {
@@ -934,12 +951,11 @@ void Link::erase_os_flash_device(
 
   API_RETURN_IF_ERROR();
 
-  const flash_os_info_t os_info = [&](){
+  const flash_os_info_t os_info = [&]() {
     flash_os_info_t result = {};
     flash_device.ioctl(I_FLASH_GETOSINFO, &result);
     return result;
   }();
-
 
   u32 size_erased = 0;
   int page = flash_device.ioctl(I_FLASH_GET_PAGE, MCU_INT_CAST(os_info.start))
@@ -979,7 +995,6 @@ void Link::erase_os_flash_device(
   if (progress_callback) {
     progress_callback->update(0, 0);
   }
-
 }
 
 void Link::install_os_flash_device(
@@ -988,7 +1003,7 @@ void Link::install_os_flash_device(
 
   API_RETURN_IF_ERROR();
 
-  const flash_os_info_t os_info = [&](){
+  const flash_os_info_t os_info = [&]() {
     flash_os_info_t result = {};
     flash_device.ioctl(I_FLASH_GETOSINFO, &result);
     return result;
@@ -1001,23 +1016,27 @@ void Link::install_os_flash_device(
     options.printer()->set_progress_key("installing");
   }
 
-  const bool is_signature_required = flash_device.ioctl(I_FLASH_IS_SIGNATURE_REQUIRED, nullptr).return_value() == 1;
-
+  const bool is_signature_required
+    = flash_device.ioctl(I_FLASH_IS_SIGNATURE_REQUIRED, nullptr).return_value()
+      == 1;
 
   const u32 image_size = options.image()->size();
-  const u32 install_size = is_signature_required ? image_size - sizeof(auth_signature_marker_t) : image_size;
+  const u32 install_size = is_signature_required
+                             ? image_size - sizeof(auth_signature_marker_t)
+                             : image_size;
   u32 size_processed = 0;
 
   do {
     flash_writepage_t write_page;
     const auto size_left = install_size - size_processed;
-    const u32 page_size = size_left > sizeof(write_page.buf) ? sizeof(write_page.buf) : size_left;
+    const u32 page_size
+      = size_left > sizeof(write_page.buf) ? sizeof(write_page.buf) : size_left;
 
     options.image()->read(var::View(write_page.buf, page_size));
     write_page.addr = os_info.start + size_processed;
     write_page.nbyte = page_size;
     flash_device.ioctl(I_FLASH_WRITEPAGE, &write_page);
-    if( is_error() ){
+    if (is_error()) {
       break;
     }
 
@@ -1027,11 +1046,11 @@ void Link::install_os_flash_device(
       progress_callback->update(size_processed, install_size);
     }
 
-  } while(size_processed < install_size);
+  } while (size_processed < install_size);
 
-
-  if( is_signature_required ){
-    const auto signature_info = Auth::get_signature_info(options.image()->seek(0));
+  if (is_signature_required) {
+    const auto signature_info
+      = Auth::get_signature_info(options.image()->seek(0));
     auth_signature_t signature = {};
     View(signature).copy(signature_info.signature().data());
     flash_device.ioctl(I_FLASH_VERIFY_SIGNATURE, &signature);
@@ -1040,11 +1059,17 @@ void Link::install_os_flash_device(
   if (progress_callback) {
     progress_callback->update(0, 0);
   }
-
 }
 
+var::NumberString Link::get_device_result_error(s32 result) {
+  const int error_number = SYSFS_GET_RETURN_ERRNO(result);
+  const int return_value = SYSFS_GET_RETURN(result);
+  return NumberString().format(
+    "device error number: %d code %d",
+    error_number,
+    return_value);
+}
 
 #else
 int sos_api_link_unused;
 #endif
-

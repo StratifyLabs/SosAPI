@@ -117,53 +117,9 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
     "/app/.install",
     fs::OpenMode::write_only() FSAPI_LINK_INHERIT_DRIVER_LAST) {
 
-  API_ASSERT(!options.name().is_empty());
   FSAPI_LINK_SET_DRIVER((*this), link_driver);
 
-  const auto path = options.mount() / "flash" / options.name();
-
-  if (FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER).exists(path)) {
-    if (options.is_overwrite()) {
-      FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER)
-        .remove(path.string_view());
-    } else {
-      if (options.is_executable()) {
-        API_RETURN_ASSIGN_ERROR(
-          "Cannot overwrite existing executable file",
-          EEXIST);
-      }
-
-      // reopen the existing file -- figure out how much data is left to write
-      // -- value is 0xffffffff
-      const auto info
-        = FILE_BASE::FileSystem(FSAPI_LINK_MEMBER_DRIVER).get_info(path);
-      m_request = I_APPFS_CREATE;
-
-      // f holds bytes in the buffer
-      m_data_size = info.size();
-      // first page must be fully written for the file to exist
-      m_bytes_written = page_size();
-
-      // now check to see how many other pages have been written
-      fs::File input(path);
-      // the seek offset to adjusted by overhead()
-      // the second page starts here
-      input.seek(page_size() - overhead());
-      u32 start = 0;
-      var::View start_view(start);
-      for (auto count : api::Index(m_data_size / page_size())) {
-        input.seek((count + 1) * page_size()).read(start_view);
-        if (start != 0xffffffff) {
-          m_bytes_written += page_size();
-        } else {
-          break;
-        }
-      }
-      return;
-    }
-  }
-
-  if (options.is_executable() == false) {
+  if (options.is_executable() == false && !options.name().is_empty()) {
 
     API_ASSERT(options.size() != 0);
     m_request = I_APPFS_CREATE;
@@ -187,6 +143,7 @@ Appfs::Appfs(const Construct &options FSAPI_LINK_DECLARE_DRIVER_LAST)
     m_data_size = f->exec.code_size;
 
   } else if (options.is_executable() == true) {
+    API_ASSERT(!options.name().is_empty());
     m_bytes_written = 0;
     m_data_size = 0;
     m_request = I_APPFS_INSTALL;

@@ -8,6 +8,7 @@
 
 ## Bug Fixes
 
+- Fixed `Link::install_os()` where last page was written erroneously on some devices
 - Fixed how `Link::DriverPath` generates paths (they must start with `@`)
 
 # Version 1.2.0

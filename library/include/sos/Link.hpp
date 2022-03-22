@@ -479,6 +479,8 @@ private:
 
   Link &reset_progress();
   Connection ping_connection(var::StringView path);
+
+  static var::NumberString get_device_result_error(s32 result);
 };
 
 } // namespace sos
