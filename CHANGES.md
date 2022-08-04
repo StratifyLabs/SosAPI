@@ -1,3 +1,9 @@
+# Version 1.4.0
+
+## New Features
+
+- port cmake files to `CMakeSDKv2.0`
+
 # Version 1.3.0
 
 ## New Features
