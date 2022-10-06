@@ -1,10 +1,10 @@
-
-set(LIBRARIES FsAPI ThreadAPI ChronoAPI VarAPI SysAPI CryptoAPI)
-if(SOS_IS_LINK)
+set(LIBRARIES CryptoAPI SysAPI FsAPI ThreadAPI)
+if(CMSDK_IS_LINK)
 	list(APPEND LIBRARIES UsbAPI StratifyOS)
 endif()
-
-api_add_api_library(SosAPI "${LIBRARIES}")
+api2_add_library(
+	NAME SosAPI
+	DEPENDENCIES ${LIBRARIES})
 
 
 

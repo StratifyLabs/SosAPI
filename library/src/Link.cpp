@@ -755,7 +755,7 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
     m_progress += bytes_read;
     if (
       progress_callback
-      && (progress_callback->update(m_progress, m_progress_max) == true)) {
+      && (progress_callback->update(m_progress, m_progress_max) == api::ProgressCallback::IsAbort::yes)) {
       break;
     }
     err = 0;
@@ -818,7 +818,7 @@ Link &Link::install_os(u32 image_id, const UpdateOs &options) {
           m_progress += bytes_read;
           if (
             progress_callback
-            && (progress_callback->update(m_progress, m_progress_max) == true)) {
+            && (progress_callback->update(m_progress, m_progress_max) == api::ProgressCallback::IsAbort::yes)) {
             break;
           }
         }
