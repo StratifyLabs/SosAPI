@@ -97,7 +97,7 @@ Sys::Info Sys::get_info() const {
 }
 
 bool Sys::is_authenticated() const {
-  return m_file.ioctl(I_SYS_ISAUTHENTICATED, nullptr).return_value();
+  return m_file.ioctl(I_SYS_ISAUTHENTICATED).return_value();
 }
 
 

@@ -161,8 +161,7 @@ Appfs &Appfs::append(
   const auto signature = Auth::get_signature(file);
   const auto is_signature_required = [&]() {
     api::ErrorScope error_scope;
-    return m_file.ioctl(I_APPFS_IS_SIGNATURE_REQUIRED, nullptr).return_value()
-           == 1;
+    return m_file.ioctl(I_APPFS_IS_SIGNATURE_REQUIRED).return_value() == 1;
   }();
 
   if (m_data_size == 0 && m_request == I_APPFS_INSTALL) {
@@ -268,7 +267,7 @@ bool Appfs::is_signature_required() const {
   // use an error scope because not all devices will support
   // I_APPFS_IS_SIGNATURE_REQUIRED
   api::ErrorScope es;
-  return m_file.ioctl(I_APPFS_IS_SIGNATURE_REQUIRED, nullptr).return_value()
+  return m_file.ioctl(I_APPFS_IS_SIGNATURE_REQUIRED).return_value()
          > 0;
 }
 
@@ -386,12 +385,12 @@ Appfs &Appfs::cleanup(CleanData clean_data) {
 }
 
 Appfs &Appfs::free_ram(var::StringView path) {
-  fs::File(path, fs::OpenMode::read_only()).ioctl(I_APPFS_FREE_RAM, nullptr);
+  fs::File(path, fs::OpenMode::read_only()).ioctl(I_APPFS_FREE_RAM);
   return *this;
 }
 
 Appfs &Appfs::reclaim_ram(var::StringView path) {
-  fs::File(path, fs::OpenMode::read_only()).ioctl(I_APPFS_RECLAIM_RAM, nullptr);
+  fs::File(path, fs::OpenMode::read_only()).ioctl(I_APPFS_RECLAIM_RAM);
   return *this;
 }
 #endif
