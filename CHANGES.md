@@ -1,3 +1,9 @@
+# Version 1.4.1
+
+## Bug Fixes
+
+- Update to `cmsdk2` and fixes required for API v1.6
+
 # Version 1.4.0
 
 ## New Features
