@@ -1,3 +1,9 @@
+# Version 1.4.2
+
+## Bug Fixes
+
+- Fix several build errors with `link` architecture
+
 # Version 1.4.1
 
 ## Bug Fixes
