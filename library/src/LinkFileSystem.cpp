@@ -214,7 +214,7 @@ const Link::FileSystem &Link::FileSystem::create_directory(
   }
 
   var::Tokenizer path_tokens
-    = var::Tokenizer(path, var::Tokenizer::Construct().set_delimeters("/"));
+    = var::Tokenizer(path, var::Tokenizer::Construct().set_delimiters("/"));
   var::String base_path;
 
   // tokenizer will strip the first / and create an empty token

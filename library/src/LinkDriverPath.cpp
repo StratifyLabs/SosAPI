@@ -172,8 +172,8 @@ var::Tokenizer Link::DriverPath::split() const {
   return var::Tokenizer(
     path(),
     var::Tokenizer::Construct()
-      .set_delimeters("/@")
-      .set_maximum_delimeter_count(6));
+      .set_delimiters("/@")
+      .set_maximum_delimiter_count(6));
 }
 
 var::String Link::DriverPath::lookup_serial_port_path_from_usb_details() {

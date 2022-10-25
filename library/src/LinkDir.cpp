@@ -8,7 +8,8 @@
 using namespace sos;
 
 Link::Dir::Dir(var::StringView path, link_transport_mdriver_t *driver)
-  : m_directory_system_resource(open(path, driver), &directory_deleter) {}
+  : fs::DirAccess<Dir>(path),
+    m_directory_system_resource(open(path, driver), &directory_deleter) {}
 
 Link::Dir::DirectoryResource
 Link::Dir::open(var::StringView path, link_transport_mdriver_t *driver) {
