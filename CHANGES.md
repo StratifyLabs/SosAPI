@@ -1,3 +1,10 @@
+# Version 1.4.3
+
+## Bug Fixes
+
+- Fix build errors when `CryptoAPI` is not available
+  - Requires setting `SOS_API_USE_CRYPTO_API` to `OFF`
+
 # Version 1.4.2
 
 ## Bug Fixes
