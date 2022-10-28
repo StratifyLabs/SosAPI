@@ -158,11 +158,15 @@ Appfs &Appfs::append(
   API_RETURN_VALUE_IF_ERROR(*this);
 
   API_ASSERT(m_request != 0);
+#if SOS_API_USE_CRYPTO_API
   const auto signature = Auth::get_signature(file);
   const auto is_signature_required = [&]() {
     api::ErrorScope error_scope;
     return m_file.ioctl(I_APPFS_IS_SIGNATURE_REQUIRED).return_value() == 1;
   }();
+#else
+  constexpr auto is_signature_required = false;
+#endif
 
   if (m_data_size == 0 && m_request == I_APPFS_INSTALL) {
     const auto file_size = file.size();
@@ -194,11 +198,13 @@ Appfs &Appfs::append(
     }
   }
 
+#if SOS_API_USE_CRYPTO_API
   if (is_signature_required && m_request == I_APPFS_INSTALL) {
     appfs_verify_signature_t verify_signature;
     View(verify_signature.data).copy(signature.data());
     m_file.ioctl(I_APPFS_VERIFY_SIGNATURE, &verify_signature);
   }
+#endif
 
   if (progress_callback) {
     progress_callback->update(0, 0);

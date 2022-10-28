@@ -1,5 +1,7 @@
 // Copyright 2016-2021 Tyler Gilbert and Stratify Labs, Inc; see LICENSE.md
 
+#if SOS_API_USE_CRYPTO_API
+
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -320,4 +322,5 @@ void Auth::create_plain_file(const CreatePlainFile &options) {
     }
   }
 }
+#endif
 #endif

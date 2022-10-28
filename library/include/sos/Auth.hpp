@@ -3,11 +3,14 @@
 #ifndef SOSAPI_AUTH_HPP
 #define SOSAPI_AUTH_HPP
 
+#if SOS_API_USE_CRYPTO_API
+
 #include <sos/dev/auth.h>
 #include <sos/link.h>
 
 #include <fs/File.hpp>
 #include <var/String.hpp>
+
 #include <crypto/Ecc.hpp>
 #include <crypto/Sha256.hpp>
 
@@ -145,5 +148,7 @@ namespace printer {
 Printer &
 operator<<(Printer &printer, const sos::Auth::SignatureInfo &a);
 } // namespace printer
+
+#endif
 
 #endif // SOSAPI_AUTH_HPP
