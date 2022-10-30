@@ -3,8 +3,16 @@ option(SOS_API_USE_CRYPTO_API "Build Auth/Crypto features." ON)
 
 if(SOS_API_USE_CRYPTO_API)
 	set(LIBRARIES CryptoAPI)
+	cmsdk2_check_version(
+		NAME CryptoAPI
+		VERSION ${CryptoAPI_VERSION}
+		MINIMUM_VERSION 1.4.1)
 else()
 	set(LIBRARIES)
+	cmsdk2_check_version(
+		NAME API
+		VERSION ${API_VERSION}
+		MINIMUM_VERSION 1.6.4)
 endif()
 
 list(APPEND LIBRARIES SysAPI FsAPI ThreadAPI)
