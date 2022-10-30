@@ -6,7 +6,7 @@ if(SOS_API_USE_CRYPTO_API)
 	cmsdk2_check_version(
 		NAME CryptoAPI
 		VERSION ${CryptoAPI_VERSION}
-		MINIMUM_VERSION 1.4.1)
+		MINIMUM_VERSION 1.4.2)
 else()
 	set(LIBRARIES)
 	cmsdk2_check_version(
