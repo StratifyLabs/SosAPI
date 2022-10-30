@@ -1,3 +1,9 @@
+# Version 1.4.4 (unreleased)
+
+## Bug Fixes
+
+- Add version info to CMakeLists.txt
+
 # Version 1.4.3
 
 ## Bug Fixes
