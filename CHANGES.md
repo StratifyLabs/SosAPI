@@ -1,4 +1,4 @@
-# Version 1.4.4 (unreleased)
+# Version 1.4.4
 
 ## Bug Fixes
 
