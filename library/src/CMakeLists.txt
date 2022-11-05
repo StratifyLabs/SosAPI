@@ -11,6 +11,5 @@ set(SOURCES
 	LinkFileSystem.cpp
 	SerialNumber.cpp
 	TaskManager.cpp
-	PARENT_SCOPE
-	)
+	PARENT_SCOPE)
 
