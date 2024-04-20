@@ -3,7 +3,7 @@
 ## Bug Fixes
 
 - Delete unused files `Cli.cpp` and `Cli.hpp`
-
+- Fix build errors when using __link build on macOS
 
 # Version 1.4.4
 
