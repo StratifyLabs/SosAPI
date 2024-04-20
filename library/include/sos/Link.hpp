@@ -338,7 +338,6 @@ public:
 
   class Dir : public fs::DirAccess<Dir> {
   public:
-    Dir() : fs::DirAccess<Dir>({}) {}
     explicit Dir(
       var::StringView path,
       link_transport_mdriver_t *driver = nullptr);
