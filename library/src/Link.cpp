@@ -1017,7 +1017,7 @@ void Link::install_os_flash_device(
   }
 
   const bool is_signature_required
-    = flash_device.ioctl(I_FLASH_IS_SIGNATURE_REQUIRED, nullptr).return_value()
+    = flash_device.ioctl(I_FLASH_IS_SIGNATURE_REQUIRED).return_value()
       == 1;
 
   const u32 image_size = options.image()->size();
